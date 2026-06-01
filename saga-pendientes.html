@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAGA — Seguimiento de Pendientes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* SAGA brand palette — extracted from logo */
+  --saga-blue:#1a5fa8;
+  --saga-blue-dark:#0f4380;
+  --saga-blue-deeper:#082d59;
+  --saga-blue-light:#2e7bc4;
+  --saga-blue-soft:#e8f2fb;
+  --saga-blue-mid:#b8d4ef;
+  --saga-accent:#4a9fd4;
+  --saga-tagline:#3a7dc0;
+
+  --white:#ffffff;
+  --gray-50:#f4f7fb;
+  --gray-100:#eaf0f8;
+  --gray-150:#dde8f4;
+  --gray-200:#c8d9ec;
+  --gray-300:#9db8d6;
+  --gray-400:#6a8fae;
+  --gray-500:#4a6a88;
+  --gray-600:#30516e;
+  --gray-700:#1e3a52;
+  --gray-800:#112233;
+  --gray-900:#090f18;
+
+  --green-100:#d8f5e8;--green-500:#1a9e58;--green-700:#0d6338;
+  --amber-100:#fef4d8;--amber-500:#d48b00;--amber-700:#8a5a00;
+  --red-100:#fde8e8;--red-500:#d93030;--red-700:#8f1f1f;
+  --purple-100:#ede9fe;--purple-500:#7c3aed;--purple-700:#4c1d95;
+
+  --font:'Inter',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+  --radius:7px;--radius-lg:11px;--radius-xl:16px;
+  --shadow:0 1px 4px rgba(9,15,24,.07),0 4px 18px rgba(9,15,24,.05);
+  --shadow-md:0 4px 16px rgba(9,15,24,.12),0 12px 40px rgba(9,15,24,.08);
+}
+
+body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min-height:100vh;font-size:14px}
+
+/* ── HEADER ── */
+.header{background:var(--saga-blue);border-bottom:3px solid var(--saga-blue-dark);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(9,15,24,.18)}
+.logo-wrap{display:flex;align-items:center;gap:0}
+.logo-img{height:34px;object-fit:contain;display:block}
+.header-divider{width:1px;height:28px;background:rgba(255,255,255,.25);margin:0 18px}
+.header-subtitle{font-size:12px;font-weight:400;color:rgba(255,255,255,.75);letter-spacing:.3px;line-height:1.3}
+.header-subtitle strong{display:block;font-weight:600;font-size:13px;color:#fff;letter-spacing:-.1px}
+.header-actions{display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s ease;white-space:nowrap}
+.btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.btn-outline-white{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.3)}
+.btn-outline-white:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5)}
+.btn-white{background:#fff;color:var(--saga-blue);border-color:#fff}
+.btn-white:hover{background:var(--saga-blue-soft);color:var(--saga-blue-dark)}
+.sync-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.7);padding:4px 11px;background:rgba(255,255,255,.12);border-radius:20px;border:1px solid rgba(255,255,255,.18)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 6px #4ade80}
+
+/* ── TOOLBAR ── */
+.toolbar{padding:14px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--gray-150);background:#fff;box-shadow:0 1px 0 var(--gray-150)}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:300px}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--gray-400);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.search-input{width:100%;padding:7px 12px 7px 32px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-700);background:#fff;outline:none;transition:all .15s}
+.search-input:focus{border-color:var(--saga-blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.filter-select{padding:7px 28px 7px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-700);background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236a8fae' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 9px center;appearance:none;outline:none;cursor:pointer;transition:all .15s}
+.filter-select:focus{border-color:var(--saga-blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.spacer{flex:1}
+.view-toggle{display:flex;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden}
+.view-btn{padding:6px 13px;background:#fff;border:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--gray-400);display:flex;align-items:center;gap:5px;transition:all .15s;font-family:var(--font)}
+.view-btn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.view-btn.active{background:var(--saga-blue);color:#fff}
+.view-btn:not(:last-child){border-right:1px solid var(--gray-200)}
+
+/* ── METRICS ── */
+.metrics-wrap{padding:18px 28px 6px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.metric-card{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:14px 16px;position:relative;overflow:hidden}
+.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--saga-blue)}
+.metric-card.danger::before{background:var(--red-500)}
+.metric-card.warn::before{background:var(--amber-500)}
+.metric-card.ok::before{background:var(--green-500)}
+.metric-card.blocked::before{background:var(--purple-500)}
+.metric-label{font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:6px}
+.metric-value{font-size:28px;font-weight:700;color:var(--gray-800);line-height:1;margin-bottom:3px}
+.metric-card.danger .metric-value{color:var(--red-500)}
+.metric-card.warn .metric-value{color:var(--amber-500)}
+.metric-card.ok .metric-value{color:var(--green-500)}
+.metric-card.blocked .metric-value{color:var(--purple-500)}
+.metric-sub{font-size:11px;color:var(--gray-400)}
+
+/* ── SECTION HEADER ── */
+.section-head{display:flex;align-items:center;justify-content:space-between;padding:16px 28px 12px}
+.section-title{font-size:13px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px}
+.result-count{font-size:12px;color:var(--gray-400)}
+
+/* ── CONTENT ── */
+.content{padding:0 28px 48px}
+
+/* ── TABLE ── */
+.table-wrap{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow)}
+.table-scroll{overflow-x:auto}
+.tasks-table{width:100%;border-collapse:collapse}
+.tasks-table th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.7px;background:var(--gray-50);border-bottom:1px solid var(--gray-150);white-space:nowrap}
+.tasks-table th:first-child{padding-left:20px}
+.tasks-table td{padding:13px 14px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.tasks-table td:first-child{padding-left:20px}
+.tasks-table tr:last-child td{border-bottom:none}
+.tasks-table tbody tr{transition:background .1s}
+.tasks-table tbody tr:hover td{background:var(--saga-blue-soft)}
+.tasks-table tbody tr.row-overdue td{background:#fff8f8}
+.tasks-table tbody tr.row-overdue:hover td{background:var(--red-100)}
+.tasks-table tbody tr.row-near td{background:#fffdf0}
+.tasks-table tbody tr.row-near:hover td{background:var(--amber-100)}
+
+/* ── KANBAN ── */
+.kanban-wrap{padding-bottom:4px}
+.kanban{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:12px;min-width:0}
+.kanban-col{background:var(--gray-100);border-radius:var(--radius-xl);padding:11px;min-height:180px}
+.kanban-col-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px}
+.col-label{display:flex;align-items:center;gap:6px}
+.col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.kanban-col-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-600)}
+.kanban-count{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fff;color:var(--gray-500)}
+.kanban-card{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:11px 13px;margin-bottom:7px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.kanban-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
+.kanban-card:hover{border-color:var(--saga-blue-mid);box-shadow:var(--shadow);transform:translateY(-1px)}
+.kanban-card.prio-crítica::before{background:#7c3aed}
+.kanban-card.prio-alta::before{background:var(--red-500)}
+.kanban-card.prio-media::before{background:var(--amber-500)}
+.kanban-card.prio-baja::before{background:var(--green-500)}
+.kcard-title{font-size:12px;font-weight:500;color:var(--gray-800);margin-bottom:7px;line-height:1.45}
+.kcard-meta{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px}
+.kcard-footer{display:flex;align-items:center;justify-content:space-between}
+.kcard-assignee{font-size:11px;color:var(--gray-500);display:flex;align-items:center;gap:5px}
+.kcard-date{font-size:10px;color:var(--gray-400);font-family:var(--mono)}
+.kcard-date.overdue{color:var(--red-500);font-weight:600}
+.kcard-date.near{color:var(--amber-500);font-weight:600}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;line-height:1.3}
+.bs-pendiente{background:#e0f2fe;color:#0369a1}
+.bs-en_proceso{background:var(--amber-100);color:var(--amber-700)}
+.bs-bloqueado{background:var(--red-100);color:var(--red-700)}
+.bs-completado{background:var(--green-100);color:var(--green-700)}
+.bs-cancelado{background:var(--gray-100);color:var(--gray-500)}
+.bp-crítica{background:var(--purple-100);color:var(--purple-700)}
+.bp-alta{background:var(--red-100);color:var(--red-700)}
+.bp-media{background:var(--amber-100);color:var(--amber-700)}
+.bp-baja{background:var(--green-100);color:var(--green-700)}
+.bt-badge{background:var(--saga-blue-soft);color:var(--saga-blue);font-size:10px;font-weight:600}
+.blocker-badge{background:#fce7f3;color:#9d174d;font-size:10px;font-weight:600}
+
+/* ── AVATAR ── */
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--saga-blue-soft);color:var(--saga-blue);font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--saga-blue-mid)}
+.avatar-xs{width:22px;height:22px;font-size:9px}
+
+/* ── DATE ── */
+.date-mono{font-family:var(--mono);font-size:11px;color:var(--gray-400)}
+.date-overdue{color:var(--red-500)!important;font-weight:600}
+.date-near{color:var(--amber-500)!important;font-weight:600}
+
+/* ── ACTION BTNS ── */
+.action-btn{width:28px;height:28px;border-radius:6px;border:1px solid transparent;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--gray-300);transition:all .15s}
+.action-btn:hover{background:var(--gray-100);color:var(--gray-600);border-color:var(--gray-200)}
+.action-btn.edit:hover{color:var(--saga-blue);background:var(--saga-blue-soft);border-color:var(--saga-blue-mid)}
+.action-btn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(9,15,24,.45);z-index:500;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:var(--radius-xl);width:100%;max-width:580px;max-height:92vh;overflow-y:auto;box-shadow:var(--shadow-md);animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{background:var(--saga-blue);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+.modal-title{font-size:15px;font-weight:600;color:#fff}
+.modal-title-sub{font-size:11px;color:rgba(255,255,255,.65);margin-top:1px}
+.modal-close{width:30px;height:30px;border-radius:var(--radius);border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;transition:all .15s}
+.modal-close:hover{background:rgba(255,255,255,.2)}
+.modal-close svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.modal-body{padding:22px 24px 18px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-800);outline:none;transition:all .15s;background:#fff}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--saga-blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.form-textarea{resize:vertical;min-height:76px;line-height:1.5}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236a8fae' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.blocker-box{background:var(--red-100);border:1px solid #fca5a5;border-radius:var(--radius);padding:10px 12px;margin-top:6px;display:none}
+.blocker-box.visible{display:block}
+.blocker-box-label{font-size:10px;font-weight:700;color:var(--red-700);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.divider{height:1px;background:var(--gray-100);margin:6px 0}
+.modal-footer{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid var(--gray-100)}
+.btn-ghost{background:transparent;color:var(--gray-500);border-color:var(--gray-200)}
+.btn-ghost:hover{background:var(--gray-100);color:var(--gray-700)}
+.btn-primary{background:var(--saga-blue);color:#fff;border-color:var(--saga-blue)}
+.btn-primary:hover{background:var(--saga-blue-dark);border-color:var(--saga-blue-dark)}
+.btn-danger{background:var(--red-100);color:var(--red-700);border-color:transparent}
+.btn-danger:hover{background:#fecaca}
+
+/* ── EMPTY ── */
+.empty-state{text-align:center;padding:56px 20px;color:var(--gray-400)}
+.empty-icon{width:52px;height:52px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;background:var(--saga-blue-soft);border-radius:50%}
+.empty-icon svg{width:26px;height:26px;stroke:var(--saga-blue);stroke-width:1.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.empty-title{font-size:15px;font-weight:600;color:var(--gray-500);margin-bottom:4px}
+.empty-sub{font-size:13px;color:var(--gray-400)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--gray-800);color:#fff;padding:12px 16px;border-radius:var(--radius-lg);font-size:13px;font-weight:500;z-index:1000;transform:translateY(60px);opacity:0;transition:all .3s ease;pointer-events:none;max-width:340px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-md)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast svg{width:15px;height:15px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.toast.success{background:var(--green-500)}
+.toast.error{background:var(--red-500)}
+
+/* ── FOOTER ── */
+.app-footer{text-align:center;padding:12px 28px;border-top:1px solid var(--gray-150);font-size:11px;color:var(--gray-400);background:#fff;display:flex;align-items:center;justify-content:center;gap:6px}
+.footer-logo{height:16px;opacity:.4;filter:grayscale(1)}
+
+@media(max-width:900px){
+  .kanban{grid-template-columns:repeat(3,minmax(180px,1fr))}
+}
+@media(max-width:640px){
+  .header{padding:0 16px}
+  .header-divider,.header-subtitle{display:none}
+  .toolbar{padding:10px 16px}
+  .metrics-wrap{padding:12px 16px 4px}
+  .content,.section-head{padding-left:16px;padding-right:16px}
+  .kanban{grid-template-columns:repeat(2,minmax(160px,1fr))}
+  .tasks-table th:nth-child(6),.tasks-table td:nth-child(6),
+  .tasks-table th:nth-child(7),.tasks-table td:nth-child(7){display:none}
+}
+
+/* ── CONFIG MODAL ── */
+.config-modal{background:#fff;border-radius:var(--radius-xl);width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-md);animation:slideUp .2s ease}
+.config-header{background:var(--saga-blue-deeper);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-radius:var(--radius-xl) var(--radius-xl) 0 0}
+.config-header-title{font-size:14px;font-weight:600;color:#fff}
+.config-header-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:1px}
+.resp-list{padding:16px 20px;display:flex;flex-direction:column;gap:8px;min-height:60px}
+.resp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--gray-50);border:1px solid var(--gray-150);border-radius:var(--radius-lg);transition:all .15s}
+.resp-item:hover{border-color:var(--saga-blue-mid);background:var(--saga-blue-soft)}
+.resp-avatar{width:32px;height:32px;border-radius:50%;background:var(--saga-blue-soft);border:2px solid var(--saga-blue-mid);color:var(--saga-blue);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.resp-name{font-size:13px;font-weight:500;color:var(--gray-800);flex:1}
+.resp-count{font-size:11px;color:var(--gray-400);margin-right:6px}
+.resp-del{width:26px;height:26px;border-radius:6px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray-300);transition:all .15s;flex-shrink:0}
+.resp-del:hover{background:var(--red-100);color:var(--red-500)}
+.resp-del svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.add-resp-row{display:flex;gap:8px;padding:0 20px 18px}
+.add-resp-input{flex:1;padding:9px 12px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-800);outline:none;transition:all .15s}
+.add-resp-input:focus{border-color:var(--saga-blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.add-resp-btn{padding:9px 16px;background:var(--saga-blue);color:#fff;border:none;border-radius:var(--radius);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .15s;display:flex;align-items:center;gap:5px}
+.add-resp-btn:hover{background:var(--saga-blue-dark)}
+.add-resp-btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.config-footer{padding:12px 20px;border-top:1px solid var(--gray-100);display:flex;justify-content:flex-end}
+.resp-empty{text-align:center;padding:24px;color:var(--gray-400);font-size:12px}
+</style>
+<style>
+/* ── SYNC PANEL ── */
+.sync-panel{background:#fff;border-radius:var(--radius-xl);width:100%;max-width:420px;box-shadow:var(--shadow-md);animation:slideUp .2s ease;overflow:hidden}
+.sync-panel-head{background:var(--saga-blue-deeper);padding:16px 22px;display:flex;align-items:center;justify-content:space-between}
+.sync-panel-title{font-size:14px;font-weight:600;color:#fff}
+.sync-panel-sub{font-size:11px;color:rgba(255,255,255,.6);margin-top:1px}
+.sync-body{padding:20px 22px}
+.sync-status-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius-lg);margin-bottom:12px;border:1px solid var(--gray-150)}
+.sync-status-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sync-status-icon svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sync-status-text{flex:1}
+.sync-status-label{font-size:13px;font-weight:500;color:var(--gray-800)}
+.sync-status-detail{font-size:11px;color:var(--gray-400);margin-top:1px}
+.sync-row-ok{background:var(--green-100);border-color:#86efac}
+.sync-row-ok .sync-status-icon{background:var(--green-500);color:#fff}
+.sync-row-error{background:var(--red-100);border-color:#fca5a5}
+.sync-row-error .sync-status-icon{background:var(--red-500);color:#fff}
+.sync-row-pending{background:var(--amber-100);border-color:#fde68a}
+.sync-row-pending .sync-status-icon{background:var(--amber-500);color:#fff}
+.sync-row-idle{background:var(--gray-50);border-color:var(--gray-200)}
+.sync-row-idle .sync-status-icon{background:var(--gray-300);color:#fff}
+.sync-steps{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.sync-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gray-600);padding:6px 0;border-bottom:1px solid var(--gray-100)}
+.sync-step:last-child{border-bottom:none}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--saga-blue-soft);color:var(--saga-blue);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-num.done{background:var(--green-100);color:var(--green-500)}
+.sync-actions{display:flex;flex-direction:column;gap:8px}
+.btn-sync{width:100%;padding:10px 16px;border-radius:var(--radius-lg);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:7px}
+.btn-sync svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.btn-sync-primary{background:var(--saga-blue);color:#fff}
+.btn-sync-primary:hover{background:var(--saga-blue-dark)}
+.btn-sync-secondary{background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-200)}
+.btn-sync-secondary:hover{background:var(--gray-200)}
+.btn-sync-danger{background:var(--red-100);color:var(--red-700)}
+.btn-sync-danger:hover{background:#fecaca}
+.config-note{font-size:11px;color:var(--gray-400);background:var(--gray-50);border:1px solid var(--gray-150);border-radius:var(--radius);padding:10px 12px;line-height:1.6;margin-top:4px}
+.config-note code{font-family:var(--mono);font-size:10px;background:var(--gray-200);padding:1px 5px;border-radius:4px;color:var(--gray-700)}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js">
+// ══════════════════════════════════════════════
+// AZURE AD + SHAREPOINT SYNC
+// ══════════════════════════════════════════════
+const SP_CONFIG_KEY = 'saga_sp_config_v1';
+let msalInstance = null;
+let spConfig = {};
+let syncInterval = null;
+let isSyncing = false;
+let lastSyncedAt = null;
+let currentUser = null;
+
+// ── Load saved config ──
+function loadSpConfig() {
+  try {
+    const d = localStorage.getItem(SP_CONFIG_KEY);
+    if (d) spConfig = JSON.parse(d);
+  } catch {}
+  if (spConfig.clientId) {
+    document.getElementById('sp-client-id').value = spConfig.clientId || '';
+    document.getElementById('sp-tenant-id').value = spConfig.tenantId || '';
+    document.getElementById('sp-site-url').value = spConfig.siteUrl || '';
+    initMsal();
+  }
+}
+
+// ── Init MSAL ──
+function initMsal() {
+  const clientId = document.getElementById('sp-client-id').value.trim() || spConfig.clientId;
+  const tenantId = document.getElementById('sp-tenant-id').value.trim() || spConfig.tenantId;
+  if (!clientId || !tenantId) return;
+  try {
+    msalInstance = new msal.PublicClientApplication({
+      auth: {
+        clientId,
+        authority: `https://login.microsoftonline.com/${tenantId}`,
+        redirectUri: window.location.href.split('?')[0],
+      },
+      cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+    });
+    // Check if already signed in
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      currentUser = accounts[0];
+      spConfig.clientId = clientId;
+      spConfig.tenantId = tenantId;
+      spConfig.siteUrl = document.getElementById('sp-site-url').value.trim() || spConfig.siteUrl;
+      localStorage.setItem(SP_CONFIG_KEY, JSON.stringify(spConfig));
+      showConnectedState();
+      startAutoSync();
+    }
+  } catch(e) {
+    console.error('MSAL init error:', e);
+  }
+}
+
+// ── Connect ──
+async function connectToSharePoint() {
+  const clientId = document.getElementById('sp-client-id').value.trim();
+  const tenantId = document.getElementById('sp-tenant-id').value.trim();
+  const siteUrl  = document.getElementById('sp-site-url').value.trim();
+  if (!clientId || !tenantId || !siteUrl) {
+    showToast('Completa los tres campos de configuración', 'error'); return;
+  }
+  spConfig = { clientId, tenantId, siteUrl };
+  localStorage.setItem(SP_CONFIG_KEY, JSON.stringify(spConfig));
+  setBtnLoading('btn-sp-connect', true, 'Conectando…');
+  initMsal();
+  try {
+    const resp = await msalInstance.loginPopup({
+      scopes: ['Files.ReadWrite', 'Sites.ReadWrite.All', 'User.Read'],
+    });
+    currentUser = resp.account;
+    showConnectedState();
+    startAutoSync();
+    await syncNow();
+    showToast('Conectado a Microsoft 365 ✓', 'success');
+  } catch(e) {
+    setBtnLoading('btn-sp-connect', false);
+    showToast('Error al conectar: ' + (e.message||e), 'error');
+  }
+}
+
+// ── Get token silently ──
+async function getToken() {
+  if (!msalInstance || !currentUser) throw new Error('No autenticado');
+  try {
+    const r = await msalInstance.acquireTokenSilent({
+      scopes: ['Files.ReadWrite', 'Sites.ReadWrite.All'],
+      account: currentUser,
+    });
+    return r.accessToken;
+  } catch {
+    const r = await msalInstance.acquireTokenPopup({
+      scopes: ['Files.ReadWrite', 'Sites.ReadWrite.All'],
+    });
+    return r.accessToken;
+  }
+}
+
+// ── Resolve SharePoint site + drive ──
+async function getSiteInfo(token) {
+  const url = spConfig.siteUrl.replace(/\/$/, '');
+  const hostname = new URL(url).hostname;
+  const path = new URL(url).pathname;
+  const apiUrl = `https://graph.microsoft.com/v1.0/sites/${hostname}:${path}`;
+  const r = await fetch(apiUrl, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(`Sitio no encontrado (${r.status})`);
+  const site = await r.json();
+  // Get default drive
+  const dr = await fetch(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!dr.ok) throw new Error('No se pudo acceder al drive');
+  const drive = await dr.json();
+  return { siteId: site.id, driveId: drive.id };
+}
+
+// ── Read file from SharePoint ──
+async function readSpFile(token, driveId) {
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/SAGA-pendientes.json:/content`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`Error leyendo archivo (${r.status})`);
+  return await r.json();
+}
+
+// ── Write file to SharePoint ──
+async function writeSpFile(token, driveId, data) {
+  const body = JSON.stringify({ app: 'SAGA Pendientes', version: 3, savedAt: new Date().toISOString(), tasks, responsables: data.responsables });
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/SAGA-pendientes.json:/content`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body,
+    }
+  );
+  if (!r.ok) throw new Error(`Error guardando archivo (${r.status})`);
+}
+
+// ── Main sync ──
+async function syncNow() {
+  if (isSyncing || !msalInstance || !currentUser) return;
+  isSyncing = true;
+  setSyncDot('syncing');
+  setBtnLoading('btn-sync-now', true, 'Sincronizando…');
+  try {
+    const token = await getToken();
+    setStep('site', 'pending', 'Conectando a SharePoint…');
+    const { siteId, driveId } = await getSiteInfo(token);
+    spConfig.driveId = driveId;
+    setStep('site', 'done', `Sitio verificado`);
+    setStep('file', 'pending', 'Leyendo datos remotos…');
+    const remote = await readSpFile(token, driveId);
+    let merged = tasks;
+    if (remote && Array.isArray(remote.tasks)) {
+      // Merge: newer updatedAt wins per task id
+      const map = new Map(tasks.map(t => [t.id, t]));
+      remote.tasks.forEach(rt => {
+        const local = map.get(rt.id);
+        if (!local || (rt.updatedAt || '') > (local.updatedAt || '')) {
+          map.set(rt.id, rt);
+        }
+      });
+      merged = [...map.values()].sort((a,b) => (b.updatedAt||'') > (a.updatedAt||'') ? 1 : -1);
+      // Merge responsables too
+      if (remote.responsables && Array.isArray(remote.responsables)) {
+        const rSet = new Set([...responsables, ...remote.responsables]);
+        responsables = [...rSet].sort((a,b)=>a.localeCompare(b,'es'));
+        saveResponsables();
+      }
+    }
+    tasks = merged;
+    saveTasks();
+    setStep('file', 'done', `Datos fusionados · ${tasks.length} tareas`);
+    // Write merged data back
+    await writeSpFile(token, driveId, { responsables });
+    renderAll();
+    lastSyncedAt = new Date();
+    setSyncDot('ok');
+    const t = lastSyncedAt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('sync-label').textContent = 'Sync ' + t;
+    document.getElementById('sp-status-sub').textContent = 'Última sync: ' + t;
+    setSpStatusRow('ok', currentUser.name || currentUser.username, 'Sincronizado con SharePoint · ' + t);
+  } catch(e) {
+    setSyncDot('error');
+    setSpStatusRow('error', 'Error de sincronización', e.message || String(e));
+    showToast('Error al sincronizar: ' + (e.message || e), 'error');
+    console.error(e);
+  } finally {
+    isSyncing = false;
+    setBtnLoading('btn-sync-now', false);
+  }
+}
+
+// ── Auto sync every 30s ──
+function startAutoSync() {
+  if (syncInterval) clearInterval(syncInterval);
+  syncInterval = setInterval(() => { syncNow(); }, 30000);
+}
+
+// ── Disconnect ──
+function disconnectSharePoint() {
+  if (!confirm('¿Desconectar la cuenta Microsoft? Los datos locales se conservan.')) return;
+  if (syncInterval) clearInterval(syncInterval);
+  if (msalInstance && currentUser) {
+    try { msalInstance.logoutPopup({ account: currentUser }); } catch {}
+  }
+  msalInstance = null; currentUser = null; spConfig = {};
+  localStorage.removeItem(SP_CONFIG_KEY);
+  document.getElementById('sp-config-section').style.display = 'block';
+  document.getElementById('sp-connected-section').style.display = 'none';
+  document.getElementById('sp-client-id').value = '';
+  document.getElementById('sp-tenant-id').value = '';
+  document.getElementById('sp-site-url').value = '';
+  setSyncDot('idle');
+  document.getElementById('sync-label').textContent = 'Sin conexión';
+  setSpStatusRow('idle', 'Sin conectar', 'Inicia sesión para activar la sincronización');
+  showToast('Cuenta desconectada');
+}
+
+// ── UI helpers ──
+function showConnectedState() {
+  document.getElementById('sp-config-section').style.display = 'none';
+  document.getElementById('sp-connected-section').style.display = 'block';
+  setSpStatusRow('ok', currentUser ? (currentUser.name || currentUser.username) : 'Conectado', 'Cuenta Microsoft vinculada');
+  setSyncDot('ok');
+  document.getElementById('sync-label').textContent = 'Conectado';
+}
+function setSpStatusRow(type, label, detail) {
+  const row = document.getElementById('sp-status-row');
+  row.className = 'sync-status-row sync-row-' + (type === 'syncing' ? 'pending' : type);
+  document.getElementById('sp-status-label').textContent = label;
+  document.getElementById('sp-status-detail').textContent = detail;
+}
+function setSyncDot(state) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  const colors = { ok:'#4ade80', error:'#f87171', syncing:'#fbbf24', idle:'#94a3b8' };
+  dot.style.background = colors[state] || colors.idle;
+  dot.style.boxShadow = state === 'ok' ? '0 0 6px #4ade80' : 'none';
+}
+function setStep(id, state, text) {
+  const num = document.getElementById('step-' + id + '-num');
+  const txt = document.getElementById('step-' + id + '-text');
+  if (num) num.className = 'step-num' + (state === 'done' ? ' done' : '');
+  if (num) num.textContent = state === 'done' ? '✓' : (id === 'site' ? '2' : '3');
+  if (txt) txt.textContent = text;
+}
+function setBtnLoading(id, loading, text) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner"></div> ${text || 'Cargando…'}`;
+  } else {
+    btn.disabled = false;
+    if (id === 'btn-sp-connect') btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Conectar con Microsoft`;
+    if (id === 'btn-sync-now') btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> Sincronizar ahora`;
+  }
+}
+
+// ── Panel open/close ──
+function openSyncPanel() {
+  loadSpConfig();
+  document.getElementById('sync-bg').classList.add('open');
+}
+function closeSyncPanel() { document.getElementById('sync-bg').classList.remove('open'); }
+function onSyncBgClick(e) { if (e.target === document.getElementById('sync-bg')) closeSyncPanel(); }
+
+// ── Hook saveTasks to also sync ──
+const _origSaveTasks = saveTasks;
+// Override saveTasks to trigger sync after local save
+function saveTasks() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  const now = new Date();
+  document.getElementById('sync-label').textContent = currentUser
+    ? 'Sync ' + now.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' })
+    : 'Guardado ' + now.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
+  // Debounced cloud sync
+  if (currentUser && !isSyncing) {
+    clearTimeout(saveTasks._debounce);
+    saveTasks._debounce = setTimeout(syncNow, 1500);
+  }
+}
+
+// ── Init on load ──
+const _origDOMReady = document.addEventListener;
+window.addEventListener('load', () => { loadSpConfig(); });
+
+</script>
+
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo-wrap" style="display:flex;align-items:center;gap:0">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 42" style="height:38px;display:block" role="img" aria-label="SAGA Seguros">
+  <!-- SAGA wordmark -->
+  <text x="2" y="26" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="28" letter-spacing="1" fill="#ffffff">SAGA</text>
+  <!-- tagline -->
+  <text x="3" y="38" font-family="Arial, sans-serif" font-weight="400" font-size="9.5" letter-spacing="0.3" fill="rgba(255,255,255,0.85)">+ seguros  + libres</text>
+</svg>
+    <div class="header-divider"></div>
+    <div class="header-subtitle">
+      <strong>Seguimiento de Pendientes</strong>
+      Panel de gestión del despacho
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline-white" onclick="openConfig()" title="Gestionar responsables">
+      <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Responsables
+    </button>
+    <div class="sync-chip" id="sync-chip" onclick="openSyncPanel()" style="cursor:pointer" title="Ver estado de sincronización">
+      <span class="sync-dot" id="sync-dot" style="background:#94a3b8"></span>
+      <span id="sync-label">Sin conexión</span>
+    </div>
+    <button class="btn btn-outline-white" onclick="exportData()">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Exportar JSON
+    </button>
+    <label class="btn btn-outline-white" style="cursor:pointer">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Importar
+      <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+    </label>
+    <button class="btn btn-white" onclick="openModal()">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nueva tarea
+    </button>
+  </div>
+</header>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input class="search-input" id="search" placeholder="Buscar pendiente, colaborador, póliza…" oninput="renderAll()">
+  </div>
+  <select class="filter-select" id="filter-responsable" onchange="renderAll()">
+    <option value="">Todos los responsables</option>
+  </select>
+  <select class="filter-select" id="filter-status" onchange="renderAll()">
+    <option value="">Todos los estatus</option>
+    <option value="pendiente">Pendiente</option>
+    <option value="en_proceso">En proceso</option>
+    <option value="bloqueado">Bloqueado</option>
+    <option value="completado">Completado</option>
+    <option value="cancelado">Cancelado</option>
+  </select>
+  <select class="filter-select" id="filter-prioridad" onchange="renderAll()">
+    <option value="">Todas las prioridades</option>
+    <option value="crítica">Crítica</option>
+    <option value="alta">Alta</option>
+    <option value="media">Media</option>
+    <option value="baja">Baja</option>
+  </select>
+  <select class="filter-select" id="filter-tipo" onchange="renderAll()">
+    <option value="">Todos los tipos</option>
+    <option value="siniestro">Siniestro</option>
+    <option value="renovacion">Renovación</option>
+    <option value="tramite">Trámite</option>
+    <option value="cliente">Cliente</option>
+    <option value="interno">Interno</option>
+  </select>
+  <div class="spacer"></div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="view-table" onclick="setView('table')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+      Tabla
+    </button>
+    <button class="view-btn" id="view-kanban" onclick="setView('kanban')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>
+      Kanban
+    </button>
+  </div>
+</div>
+
+<!-- METRICS -->
+<div class="metrics-wrap" id="metrics"></div>
+
+<!-- SECTION HEADER -->
+<div class="section-head">
+  <span class="section-title" id="section-title">Tareas</span>
+  <span class="result-count" id="result-count"></span>
+</div>
+
+<!-- CONTENT -->
+<div class="content" id="content"></div>
+
+<!-- FOOTER -->
+<footer class="app-footer">
+  <span style="font-weight:700;color:var(--saga-blue);font-size:12px">SAGA</span><span style="display:none"><img class="footer-logo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAeAB4AAD/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAEAAAAAAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAApAGQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD6prM1vXtK0KIS6vfQWiHp5jYJ+g6mtI18reK7mCf4v3X/AAnH2j+zo7hlKjPEX8GMfw9OnvXVhcOq8mm9FqceMxLoRTS1bt5H0JpXjzwxqtysFjrNpJMxwqFtpP0zjNdLnvXjFv4M+Gvie7tf7CvooZkcM0MM5DSgdircj6ivQvHGsxeFPBd7eIQrQQ+XApOcuRhR/n0pVaUOZRp3u+jQ6VafK5VLWXVMng8YeH59VGmw6ravfFzF5Ib5tw6j61v18cDSNU0vQ9M8Yq7Ay3rbWPUMpyG/E7h+FfT7eK4D4AbxJAA8YtDcBc/xY+7+fFa4nBqlbkd76fMywmNdXm9orW1+Rp634g0nQ4xJq9/b2inp5j4J+g6ms7SfHXhnVrlbew1i1kmbhULbS30zjNeG/DLw43xL8R6lq3ii4lnggILIGI3M2cKPRQB0Fdp4y+D2hTrCdBuY9Ju0YbhJKWVl7nBOQaqWGoU5eznJ834ERxVepH2lOK5fxPY85rF1zxVomhXEcGr6lb2krrvVJGwSPWpfDtt/Zug2ttJfvffZ49rXMhBL47nFfNniKG8+JHi/xLqFizNb6fAzxDGconCqPr8xrLDYaNWT5naK6m2KxUqMFyq8n0PqS2niureOe3dZIZFDo6nIYHkEVLXlv7P3iL+1fB/9nTPm504vLwTyYzyp/mPwr1KsK1J0puD6HRQqqtTU11CiiiszUQ15JrXjP4f+INbvNM8RW0Ya1cxLczx4DEcEBhyMH1r1vFc1r3gTw3rs5n1LSreSc9ZFBRj9SMZrahKEHed/kc+IhUnG0LfM+cPiHaeHLXxDYDwBcSyyN1ETMwV8/LsPXNdX8b9ZvdQbw/4YXMt8Io5LlF6tMwAVf5n8a9k0DwL4c8P3An0vS4Ipx0lbLsPoTnFUzoXhSfxgbxrSB9aVhN5rMSd44HfqMV6CxkZSTSb5U/X5nmzwkoRalJR52lbp8vM8r1TSPiFc+DF8Pz+HrIabDGoUoy71285Hzdf8ad8Grw+IfBniDwbcS7ZjEzW+7sG4I/BsH8a9hn8Y6HA8qTXe1o5fIYGNvvc57dODzXP6RD4G0rV5tS06BLe9UvulVZBnIcsR2I+R/wAqj6xKVNxlC3VW7mn1aMakZRnfo7voeW/CTxNH8P8AX9U0fxRHJaLMwDOyk+W65HPsQetSfG/U/CmssmpaTqcl3q7BIwkTHy1QZyTx15r1fX5vBviJxDrFvHdMrmMSNAwKnIX74HAyQOuMmqvhrwV4DmhOo6ZpkEscTEF59xCkezVaxEFP24otS/BkPDzdP2EZJx/FHCabr8nhz4AIcvHd30ksEOeD8zHLD8M1lfDK08daRoclx4d0S0ntNQw5lnYbnAyAPvDjrXrniW38L67o73Wo2Ud9Dp24LErY28gcAHFT6d4s0Kwg+xKrWdraRhY/kJTADcAjuAh4qXXajJKGrd3cI0YylGXtNErKx4f8O72+8D/FJbTWYBZ/bD5M8WflUOcqR7A4r6hFeceIX8B6zqT3eswrNewBULNHIGXngcdwT+FeiQFTChj5TaNv0rnxdT2rjO1nbU68FS9ipQUrq+g+iiiuM7gooooADVZbK3F2boRKJyu0v7f5NWaKabWxMoRla62MaXwzo8kryPp8LSO/mMxzktzz+p496qQ+DNGWS7aa288XD72WQ5A+9wMf7zfnXSUVXtJrS5LpQfQyn8PaU7xM1jCTGxdeOhJyf1AP1qxp2mWenQPDZW6QxOxdlH8R9TV2ik5SejZShFbIojSrL7LNbG2QwTEs6EcMSc/zqo/hnRnkLtp0BYgqeOoOf8T+dbNFHPLuSqUErJaGPceGtHuXneawhZpyDIefmPvWvGixoqIAqqMADsKWik5N7spRS2QUUUUij//Z" alt="SAGA"></span>
+  SAGA + seguros + libres &nbsp;·&nbsp; Herramienta interna de gestión &nbsp;·&nbsp; v2.0
+</footer>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal-bg" onclick="onBgClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-title">Nueva tarea</div>
+        <div class="modal-title-sub">SAGA · Seguimiento de pendientes</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Descripción del pendiente *</label>
+          <input class="form-input" id="f-titulo" placeholder="Ej: Gestionar endoso póliza AUTO-2345-A">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de gestión</label>
+          <select class="form-select" id="f-tipo">
+            <option value="siniestro">🔴 Siniestro / Reclamación</option>
+            <option value="renovacion">🔵 Renovación / Vencimiento</option>
+            <option value="tramite">🟡 Trámite con aseguradora</option>
+            <option value="cliente">🟢 Atención a cliente</option>
+            <option value="interno">⚪ Proceso interno</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsable *</label>
+          <select class="form-select" id="f-responsable"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de solicitud</label>
+          <input class="form-input" type="date" id="f-fecha-sol">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha límite</label>
+          <input class="form-input" type="date" id="f-fecha-lim">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prioridad</label>
+          <select class="form-select" id="f-prioridad">
+            <option value="baja">⚪ Baja</option>
+            <option value="media" selected>🟡 Media</option>
+            <option value="alta">🔴 Alta</option>
+            <option value="crítica">🟣 Crítica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estatus</label>
+          <select class="form-select" id="f-status">
+            <option value="pendiente">Pendiente</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="bloqueado">Bloqueado</option>
+            <option value="completado">Completado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <div class="divider"></div>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Blocker / Dependencia externa</label>
+          <select class="form-select" id="f-blocker-tipo" onchange="toggleBlocker()">
+            <option value="">Sin blocker</option>
+            <option value="aseguradora">Aseguradora</option>
+            <option value="cliente">Cliente</option>
+            <option value="ajustador">Ajustador independiente</option>
+            <option value="gobierno">Trámite gubernamental</option>
+            <option value="otro">Otro tercero</option>
+          </select>
+          <div class="blocker-box" id="blocker-box">
+            <div class="blocker-box-label">
+              <svg style="width:12px;height:12px;stroke:var(--red-700);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Detalle del blocker
+            </div>
+            <input class="form-input" id="f-blocker-detalle" placeholder="Ej: Esperando dictamen GNP · Folio 990234" style="background:#fff">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">No. de póliza / expediente</label>
+          <input class="form-input" id="f-poliza" placeholder="Ej: AUTO-2345-A">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cliente / Asegurado</label>
+          <input class="form-input" id="f-cliente" placeholder="Nombre del cliente">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Notas y avances</label>
+          <textarea class="form-textarea" id="f-notas" placeholder="Contexto adicional, instrucciones, últimos avances…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" id="btn-delete" style="display:none" onclick="deleteTask()">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        Eliminar
+      </button>
+      <button class="btn btn-primary" onclick="saveTask()">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- SYNC / AZURE PANEL -->
+<div class="modal-bg" id="sync-bg" onclick="onSyncBgClick(event)">
+  <div class="sync-panel">
+    <div class="sync-panel-head">
+      <div>
+        <div class="sync-panel-title">Sincronización SharePoint</div>
+        <div class="sync-panel-sub" id="sp-status-sub">Conecta con tu cuenta Microsoft</div>
+      </div>
+      <button class="modal-close" onclick="closeSyncPanel()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="sync-body">
+      <div id="sp-status-row" class="sync-status-row sync-row-idle">
+        <div class="sync-status-icon">
+          <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        </div>
+        <div class="sync-status-text">
+          <div class="sync-status-label" id="sp-status-label">Sin conectar</div>
+          <div class="sync-status-detail" id="sp-status-detail">Inicia sesión para activar la sincronización</div>
+        </div>
+      </div>
+
+      <div id="sp-config-section">
+        <div class="config-note" style="margin-bottom:14px">
+          <strong style="color:var(--gray-600)">Configuración requerida (una sola vez)</strong><br>
+          Necesitas 3 datos de tu tenant Azure AD. Ve a <code>portal.azure.com</code> → App registrations → Nueva app → copia los IDs.<br><br>
+          <strong style="color:var(--gray-600)">Permisos necesarios:</strong> <code>Files.ReadWrite</code> y <code>Sites.ReadWrite.All</code>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+          <div class="form-group">
+            <label class="form-label">Client ID (Application ID)</label>
+            <input class="form-input" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style="font-family:var(--mono);font-size:12px">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tenant ID (Directory ID)</label>
+            <input class="form-input" id="sp-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style="font-family:var(--mono);font-size:12px">
+          </div>
+          <div class="form-group">
+            <label class="form-label">URL del sitio SharePoint</label>
+            <input class="form-input" id="sp-site-url" placeholder="https://tuempresa.sharepoint.com/sites/SAGA">
+          </div>
+        </div>
+        <div class="sync-actions">
+          <button class="btn-sync btn-sync-primary" onclick="connectToSharePoint()" id="btn-sp-connect">
+            <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+            Conectar con Microsoft
+          </button>
+        </div>
+      </div>
+
+      <div id="sp-connected-section" style="display:none">
+        <div class="sync-steps" id="sp-sync-steps">
+          <div class="sync-step"><div class="step-num done">✓</div> Autenticado con Microsoft 365</div>
+          <div class="sync-step" id="step-site"><div class="step-num" id="step-site-num">2</div> <span id="step-site-text">Verificando sitio SharePoint…</span></div>
+          <div class="sync-step" id="step-file"><div class="step-num" id="step-file-num">3</div> <span id="step-file-text">Buscando archivo de datos…</span></div>
+        </div>
+        <div class="sync-actions">
+          <button class="btn-sync btn-sync-primary" onclick="syncNow()" id="btn-sync-now">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            Sincronizar ahora
+          </button>
+          <button class="btn-sync btn-sync-secondary" onclick="disconnectSharePoint()" id="btn-sp-disconnect">
+            <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Desconectar cuenta
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG MODAL (responsables) -->
+<div class="modal-bg" id="config-bg" onclick="onConfigBgClick(event)">
+  <div class="config-modal">
+    <div class="config-header">
+      <div>
+        <div class="config-header-title">Gestión de responsables</div>
+        <div class="config-header-sub">Colaboradores del despacho SAGA</div>
+      </div>
+      <button class="modal-close" onclick="closeConfig()">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="resp-list" id="resp-list"></div>
+    <div class="add-resp-row">
+      <input class="add-resp-input" id="new-resp-input" placeholder="Nombre del colaborador" onkeydown="if(event.key==='Enter')addResponsable()">
+      <button class="add-resp-btn" onclick="addResponsable()">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Agregar
+      </button>
+    </div>
+    <div class="config-footer">
+      <button class="btn btn-ghost" onclick="closeConfig()" style="font-size:13px;padding:7px 16px">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg"></span>
+</div>
+
+<script>
+const STORAGE_KEY='saga_pendientes_v3';
+let tasks=[];
+let currentView='table';
+let editingId=null;
+
+function loadTasks(){
+  try{const d=localStorage.getItem(STORAGE_KEY);if(d)tasks=JSON.parse(d);}catch(e){tasks=[];}
+  if(!tasks.length)tasks=getSampleData();
+}
+function saveTasks(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks));
+  const now=new Date();
+  document.getElementById('sync-label').textContent='Guardado '+now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+function uid(){return'saga_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);}
+
+function getSampleData(){
+  const t=new Date(),d=n=>{const x=new Date(t);x.setDate(x.getDate()+n);return x.toISOString().split('T')[0];};
+  return[
+    {id:uid(),titulo:'Reclamación robo total — seguimiento urgente',tipo:'siniestro',responsable:'Ana García',cliente:'Lic. Fuentes Herrera',fechaSol:d(-10),fechaLim:d(-2),prioridad:'crítica',status:'bloqueado',blockerTipo:'ajustador',blockerDetalle:'Esperando dictamen ajustador independiente · Folio ADJ-2024-881',poliza:'AUTO-8821-A',notas:'Cliente inconforme. Seguimiento diario requerido.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Renovación flotilla empresarial — cotizaciones',tipo:'renovacion',responsable:'Carlos López',cliente:'Grupo Logístico Torres',fechaSol:d(-5),fechaLim:d(3),prioridad:'alta',status:'en_proceso',blockerTipo:'',blockerDetalle:'',poliza:'FLOT-445',notas:'Cotizaciones solicitadas a GNP, AXA y Qualitas.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Endoso incremento suma asegurada inmueble',tipo:'tramite',responsable:'María Rodríguez',cliente:'Inmobiliaria del Norte SA',fechaSol:d(-3),fechaLim:d(7),prioridad:'media',status:'pendiente',blockerTipo:'aseguradora',blockerDetalle:'En revisión GNP · Trámite 990234',poliza:'INM-3301',notas:'',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Queja por demora en pago de siniestro',tipo:'cliente',responsable:'Ana García',cliente:'Familia Vega Morales',fechaSol:d(-1),fechaLim:d(2),prioridad:'alta',status:'en_proceso',blockerTipo:'',blockerDetalle:'',poliza:'VIDA-7721',notas:'Escalar si no hay respuesta hoy.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Actualización base pólizas vencidas Q2',tipo:'interno',responsable:'Luis Martínez',cliente:'',fechaSol:d(-8),fechaLim:d(10),prioridad:'baja',status:'pendiente',blockerTipo:'',blockerDetalle:'',poliza:'',notas:'',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Siniestro daños a terceros — accidente vial',tipo:'siniestro',responsable:'Carlos López',cliente:'Pedro Ramírez',fechaSol:d(-15),fechaLim:d(-5),prioridad:'alta',status:'completado',blockerTipo:'',blockerDetalle:'',poliza:'AUTO-9923',notas:'Resuelto. Pago procesado por aseguradora.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Renovación GMM — actualización beneficiarios',tipo:'renovacion',responsable:'María Rodríguez',cliente:'Familia Torres Sánchez',fechaSol:d(-2),fechaLim:d(14),prioridad:'media',status:'pendiente',blockerTipo:'cliente',blockerDetalle:'Pendiente confirmación datos beneficiarios',poliza:'GMM-5512',notas:'',updatedAt:new Date().toISOString()},
+  ];
+}
+
+function getFiltered(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const fR=document.getElementById('filter-responsable').value;
+  const fS=document.getElementById('filter-status').value;
+  const fP=document.getElementById('filter-prioridad').value;
+  const fT=document.getElementById('filter-tipo').value;
+  return tasks.filter(t=>{
+    if(q&&!`${t.titulo} ${t.responsable} ${t.poliza} ${t.cliente} ${t.notas}`.toLowerCase().includes(q))return false;
+    if(fR&&t.responsable!==fR)return false;
+    if(fS&&t.status!==fS)return false;
+    if(fP&&t.prioridad!==fP)return false;
+    if(fT&&t.tipo!==fT)return false;
+    return true;
+  });
+}
+
+function updateResponsableFilter(){
+  const sel=document.getElementById('filter-responsable');
+  const cur=sel.value;
+  const names=[...new Set(tasks.map(t=>t.responsable).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todos los responsables</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if(names.includes(cur))sel.value=cur;
+}
+
+function dateStatus(lim,status){
+  if(!lim||status==='completado'||status==='cancelado')return'ok';
+  const today=new Date();today.setHours(0,0,0,0);
+  const d=new Date(lim+'T00:00:00');
+  const diff=Math.floor((d-today)/(1000*60*60*24));
+  if(diff<0)return'overdue';
+  if(diff<=3)return'near';
+  return'ok';
+}
+function fmtDate(d){
+  if(!d)return'—';
+  const[y,m,day]=d.split('-');return`${day}/${m}/${y.slice(2)}`;
+}
+
+function renderMetrics(){
+  const active=tasks.filter(t=>t.status!=='completado'&&t.status!=='cancelado');
+  const blocked=tasks.filter(t=>t.status==='bloqueado');
+  const overdue=active.filter(t=>dateStatus(t.fechaLim,t.status)==='overdue');
+  const near=active.filter(t=>dateStatus(t.fechaLim,t.status)==='near');
+  const done=tasks.filter(t=>t.status==='completado');
+  const pct=tasks.length?Math.round((done.length/tasks.length)*100):0;
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric-card"><div class="metric-label">Activos</div><div class="metric-value">${active.length}</div><div class="metric-sub">en seguimiento</div></div>
+    <div class="metric-card danger"><div class="metric-label">Vencidos</div><div class="metric-value">${overdue.length}</div><div class="metric-sub">pasaron fecha límite</div></div>
+    <div class="metric-card warn"><div class="metric-label">Por vencer</div><div class="metric-value">${near.length}</div><div class="metric-sub">próximos 3 días</div></div>
+    <div class="metric-card blocked"><div class="metric-label">Bloqueados</div><div class="metric-value">${blocked.length}</div><div class="metric-sub">dependen de tercero</div></div>
+    <div class="metric-card ok"><div class="metric-label">Completados</div><div class="metric-value">${done.length}</div><div class="metric-sub">${pct}% del total</div></div>
+  `;
+}
+
+function renderTable(filtered){
+  const cont=document.getElementById('content');
+  if(!filtered.length){
+    cont.innerHTML=`<div class="table-wrap"><div class="empty-state"><div class="empty-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><div class="empty-title">Sin resultados</div><div class="empty-sub">Prueba ajustando los filtros</div></div></div>`;
+    return;
+  }
+  const rows=filtered.map(t=>{
+    const ds=dateStatus(t.fechaLim,t.status);
+    const rc=ds==='overdue'?'row-overdue':ds==='near'?'row-near':'';
+    const dc=ds==='overdue'?'date-overdue':ds==='near'?'date-near':'';
+    const bl=t.blockerTipo?`<span class="badge blocker-badge">⚠ ${esc(t.blockerTipo)}</span>`:'';
+    return`<tr class="${rc}" onclick="openModal('${t.id}')" style="cursor:pointer">
+      <td style="max-width:260px;min-width:180px">
+        <div style="font-weight:500;font-size:13px;color:var(--gray-800);margin-bottom:4px;line-height:1.4">${esc(t.titulo)}</div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center">
+          ${tipoBadge(t.tipo)}
+          ${t.poliza?`<span style="font-family:var(--mono);font-size:10px;color:var(--gray-400);background:var(--gray-100);padding:1px 6px;border-radius:4px">${esc(t.poliza)}</span>`:''}
+          ${t.cliente?`<span style="font-size:10px;color:var(--gray-400)">${esc(t.cliente)}</span>`:''}
+        </div>
+      </td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar">${initials(t.responsable)}</div><span style="font-size:13px;white-space:nowrap">${esc(t.responsable)}</span></div></td>
+      <td><span class="date-mono">${fmtDate(t.fechaSol)}</span></td>
+      <td><span class="date-mono ${dc}" style="white-space:nowrap">${t.fechaLim?fmtDate(t.fechaLim)+(ds==='overdue'?' ⚠':''):'—'}</span></td>
+      <td><span class="badge bp-${t.prioridad}">${t.prioridad}</span></td>
+      <td><span class="badge bs-${t.status}">${statusLabel(t.status)}</span></td>
+      <td>${bl}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="action-btn edit" onclick="openModal('${t.id}')" title="Editar">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+  cont.innerHTML=`<div class="table-wrap"><div class="table-scroll">
+    <table class="tasks-table">
+      <thead><tr>
+        <th>Pendiente / Póliza</th><th>Responsable</th><th>Solicitud</th><th>Fecha límite</th><th>Prioridad</th><th>Estatus</th><th>Blocker</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div></div>`;
+}
+
+function renderKanban(filtered){
+  const cols=[
+    {key:'pendiente',label:'Pendiente',dot:'#0369a1'},
+    {key:'en_proceso',label:'En proceso',dot:var_amber},
+    {key:'bloqueado',label:'Bloqueado',dot:'#d93030'},
+    {key:'completado',label:'Completado',dot:'#1a9e58'},
+    {key:'cancelado',label:'Cancelado',dot:'#6a8fae'},
+  ];
+  const html=cols.map(col=>{
+    const ct=filtered.filter(t=>t.status===col.key);
+    const cards=ct.length?ct.map(t=>{
+      const ds=dateStatus(t.fechaLim,t.status);
+      const dc=ds==='overdue'?'overdue':ds==='near'?'near':'';
+      const bl=t.blockerTipo?`<span class="badge blocker-badge">⚠ ${esc(t.blockerTipo)}</span>`:'';
+      return`<div class="kanban-card prio-${t.prioridad}" onclick="openModal('${t.id}')">
+        <div class="kcard-title">${esc(t.titulo)}</div>
+        <div class="kcard-meta">${tipoBadge(t.tipo)}<span class="badge bp-${t.prioridad}">${t.prioridad}</span>${bl}</div>
+        <div class="kcard-footer">
+          <div class="kcard-assignee"><div class="avatar avatar-xs">${initials(t.responsable)}</div>${esc(t.responsable.split(' ')[0])}</div>
+          <div class="kcard-date ${dc}">${t.fechaLim?fmtDate(t.fechaLim):''}</div>
+        </div>
+      </div>`;
+    }).join(''):`<div style="padding:18px 8px;text-align:center;color:var(--gray-300);font-size:11px">Sin tareas</div>`;
+    return`<div class="kanban-col">
+      <div class="kanban-col-header">
+        <div class="col-label"><div class="col-dot" style="background:${col.dot}"></div><span class="kanban-col-title">${col.label}</span></div>
+        <span class="kanban-count">${ct.length}</span>
+      </div>${cards}
+    </div>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`<div class="kanban-wrap"><div class="kanban">${html}</div></div>`;
+}
+
+// Fix: use JS string not CSS var reference
+const var_amber='#d48b00';
+
+function renderAll(){
+  const f=getFiltered();
+  renderMetrics();
+  updateResponsableFilter();
+  const active=tasks.filter(t=>t.status!=='completado'&&t.status!=='cancelado');
+  document.getElementById('section-title').textContent=currentView==='table'?'Vista de tabla':'Vista Kanban';
+  document.getElementById('result-count').textContent=`${f.length} de ${tasks.length} tarea${tasks.length!==1?'s':''}`;
+  if(currentView==='table')renderTable(f);
+  else renderKanban(f);
+}
+
+function setView(v){
+  currentView=v;
+  document.getElementById('view-table').classList.toggle('active',v==='table');
+  document.getElementById('view-kanban').classList.toggle('active',v==='kanban');
+  renderAll();
+}
+
+function openModal(id){
+  editingId=id||null;
+  const t=id?tasks.find(x=>x.id===id):null;
+  document.getElementById('modal-title').textContent=t?'Editar tarea':'Nueva tarea';
+  document.getElementById('btn-delete').style.display=t?'inline-flex':'none';
+  document.getElementById('f-titulo').value=t?t.titulo:'';
+  document.getElementById('f-tipo').value=t?t.tipo:'siniestro';
+  // populate responsable select
+  const rsel=document.getElementById('f-responsable');
+  rsel.innerHTML=responsables.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+  if(t&&t.responsable)rsel.value=t.responsable;
+  else if(responsables.length)rsel.value=responsables[0];
+  document.getElementById('f-fecha-sol').value=t?t.fechaSol:new Date().toISOString().split('T')[0];
+  document.getElementById('f-fecha-lim').value=t?t.fechaLim:'';
+  document.getElementById('f-prioridad').value=t?t.prioridad:'media';
+  document.getElementById('f-status').value=t?t.status:'pendiente';
+  document.getElementById('f-blocker-tipo').value=t?t.blockerTipo:'';
+  document.getElementById('f-blocker-detalle').value=t?t.blockerDetalle:'';
+  document.getElementById('f-poliza').value=t?t.poliza:'';
+  document.getElementById('f-cliente').value=t?t.cliente:'';
+  document.getElementById('f-notas').value=t?t.notas:'';
+  toggleBlocker();
+  document.getElementById('modal-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('f-titulo').focus(),120);
+}
+function closeModal(){document.getElementById('modal-bg').classList.remove('open');editingId=null;}
+function onBgClick(e){if(e.target===document.getElementById('modal-bg'))closeModal();}
+function toggleBlocker(){
+  const v=document.getElementById('f-blocker-tipo').value;
+  document.getElementById('blocker-box').classList.toggle('visible',!!v);
+}
+function saveTask(){
+  const titulo=document.getElementById('f-titulo').value.trim();
+  const responsable=document.getElementById('f-responsable').value.trim();
+  if(!titulo){showToast('Escribe la descripción del pendiente','error');document.getElementById('f-titulo').focus();return;}
+  if(!responsable){showToast('Asigna un responsable','error');document.getElementById('f-responsable').focus();return;}
+  const task={
+    id:editingId||uid(),
+    titulo,tipo:document.getElementById('f-tipo').value,
+    responsable,
+    cliente:document.getElementById('f-cliente').value.trim(),
+    fechaSol:document.getElementById('f-fecha-sol').value,
+    fechaLim:document.getElementById('f-fecha-lim').value,
+    prioridad:document.getElementById('f-prioridad').value,
+    status:document.getElementById('f-status').value,
+    blockerTipo:document.getElementById('f-blocker-tipo').value,
+    blockerDetalle:document.getElementById('f-blocker-detalle').value.trim(),
+    poliza:document.getElementById('f-poliza').value.trim(),
+    notas:document.getElementById('f-notas').value.trim(),
+    updatedAt:new Date().toISOString(),
+  };
+  if(editingId){const i=tasks.findIndex(x=>x.id===editingId);if(i>-1)tasks[i]=task;}
+  else tasks.unshift(task);
+  saveTasks();closeModal();renderAll();
+  showToast(editingId?'Tarea actualizada correctamente':'Tarea creada en SAGA','success');
+}
+function deleteTask(){
+  if(!editingId||!confirm('¿Eliminar esta tarea permanentemente?'))return;
+  tasks=tasks.filter(t=>t.id!==editingId);
+  saveTasks();closeModal();renderAll();
+  showToast('Tarea eliminada');
+}
+function exportData(){
+  const blob=new Blob([JSON.stringify({app:'SAGA Pendientes',version:3,exportedAt:new Date().toISOString(),tasks},null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`SAGA-pendientes-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  showToast('Exportado — guarda el JSON en SharePoint para sincronizar');
+}
+function importData(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      const imported=data.tasks||data;
+      if(!Array.isArray(imported))throw new Error();
+      const map=new Map(tasks.map(t=>[t.id,t]));
+      imported.forEach(t=>{if(t.id)map.set(t.id,t);});
+      tasks=[...map.values()].sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
+      saveTasks();renderAll();
+      showToast(`${imported.length} tareas importadas y fusionadas`,'success');
+    }catch{showToast('Error al leer el archivo JSON','error');}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function initials(n){return(n||'?').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();}
+function statusLabel(s){return{pendiente:'Pendiente',en_proceso:'En proceso',bloqueado:'Bloqueado',completado:'Completado',cancelado:'Cancelado'}[s]||s;}
+function tipoBadge(tipo){
+  const m={siniestro:'🔴 Siniestro',renovacion:'🔵 Renovación',tramite:'🟡 Trámite',cliente:'🟢 Cliente',interno:'⚪ Interno'};
+  return`<span class="badge bt-badge">${m[tipo]||tipo}</span>`;
+}
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.className='toast'+(type?' '+type:'');
+  document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+let _lastHash='';
+setInterval(()=>{
+  const cur=localStorage.getItem(STORAGE_KEY)||'';
+  if(cur&&cur!==_lastHash){
+    _lastHash=cur;
+    try{
+      const loaded=JSON.parse(cur);
+      if(JSON.stringify(loaded)!==JSON.stringify(tasks)){tasks=loaded;renderAll();}
+    }catch{}
+  }
+},7000);
+
+document.addEventListener('DOMContentLoaded',()=>{
+  loadTasks();
+  loadResponsables();
+  document.getElementById('f-fecha-sol').value=new Date().toISOString().split('T')[0];
+  renderAll();
+  _lastHash=localStorage.getItem(STORAGE_KEY)||'';
+  saveTasks();
+});
+
+// ── RESPONSABLES CONFIG ──
+const RESP_KEY='saga_responsables_v1';
+let responsables=[];
+
+function loadResponsables(){
+  try{const d=localStorage.getItem(RESP_KEY);if(d)responsables=JSON.parse(d);}catch{}
+  if(!responsables.length)responsables=getDefaultResponsables();
+}
+function getDefaultResponsables(){
+  // Extract unique names from existing tasks as seed
+  const fromTasks=[...new Set(tasks.map(t=>t.responsable).filter(Boolean))];
+  return fromTasks.length?fromTasks:['Responsable 1'];
+}
+function saveResponsables(){
+  localStorage.setItem(RESP_KEY,JSON.stringify(responsables));
+}
+function openConfig(){
+  renderRespList();
+  document.getElementById('config-bg').classList.add('open');
+  setTimeout(()=>document.getElementById('new-resp-input').focus(),120);
+}
+function closeConfig(){
+  document.getElementById('config-bg').classList.remove('open');
+  // Refresh the responsable dropdown in the task form
+  updateResponsableFilter();
+  // Also update the form select if open
+  updateFormResponsableSelect();
+}
+function onConfigBgClick(e){if(e.target===document.getElementById('config-bg'))closeConfig();}
+
+function renderRespList(){
+  const list=document.getElementById('resp-list');
+  if(!responsables.length){
+    list.innerHTML='<div class="resp-empty">Sin responsables registrados.<br>Agrega colaboradores abajo.</div>';
+    return;
+  }
+  list.innerHTML=responsables.map((r,i)=>{
+    const taskCount=tasks.filter(t=>t.responsable===r&&t.status!=='completado'&&t.status!=='cancelado').length;
+    return`<div class="resp-item">
+      <div class="resp-avatar">${initials(r)}</div>
+      <span class="resp-name">${esc(r)}</span>
+      <span class="resp-count">${taskCount} activa${taskCount!==1?'s':''}</span>
+      <button class="resp-del" onclick="removeResponsable(${i})" title="Eliminar">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function addResponsable(){
+  const input=document.getElementById('new-resp-input');
+  const name=input.value.trim();
+  if(!name){input.focus();return;}
+  if(responsables.includes(name)){showToast('Este colaborador ya existe','error');input.select();return;}
+  responsables.push(name);
+  responsables.sort((a,b)=>a.localeCompare(b,'es'));
+  saveResponsables();
+  renderRespList();
+  input.value='';
+  input.focus();
+  showToast(`${name} agregado como responsable`,'success');
+}
+
+function removeResponsable(i){
+  const name=responsables[i];
+  const active=tasks.filter(t=>t.responsable===name&&t.status!=='completado'&&t.status!=='cancelado').length;
+  if(active>0){
+    if(!confirm(`${name} tiene ${active} tarea(s) activa(s). ¿Eliminar de todas formas?`))return;
+  }
+  responsables.splice(i,1);
+  saveResponsables();
+  renderRespList();
+  showToast(`${name} eliminado`);
+}
+
+function updateFormResponsableSelect(){
+  // Replace the text input with a select IF responsables exist
+  const sel=document.getElementById('f-responsable-select');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML=responsables.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+  if(cur&&responsables.includes(cur))sel.value=cur;
+}
+
+</script>
+</body>
+</html>
