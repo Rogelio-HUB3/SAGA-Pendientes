@@ -825,20 +825,21 @@ function loadSpConfig(){
     document.getElementById('sp-client-id').value=spConfig.clientId||'';
     document.getElementById('sp-tenant-id').value=spConfig.tenantId||'';
     document.getElementById('sp-site-url').value=spConfig.siteUrl||'';
-    initMsal();
+    initMsal().catch(e=>console.error('Auto-init error:',e));
   }
 }
 function openSyncPanel(){loadSpConfig();document.getElementById('sync-overlay').style.display='flex';}
 function closeSyncPanel(){document.getElementById('sync-overlay').style.display='none';}
-function initMsal(){
+async function initMsal(){
   const clientId=(document.getElementById('sp-client-id').value||'').trim()||spConfig.clientId;
   const tenantId=(document.getElementById('sp-tenant-id').value||'').trim()||spConfig.tenantId;
-  if(!clientId||!tenantId)return;
+  if(!clientId||!tenantId)return false;
   try{
     msalInstance=new msal.PublicClientApplication({
-      auth:{clientId,authority:`https://login.microsoftonline.com/${tenantId}`,redirectUri:window.location.href.split('?')[0]},
+      auth:{clientId,authority:`https://login.microsoftonline.com/${tenantId}`,redirectUri:window.location.origin+window.location.pathname},
       cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
     });
+    await msalInstance.initialize();
     const accounts=msalInstance.getAllAccounts();
     if(accounts.length>0){
       currentUser=accounts[0];
@@ -847,7 +848,8 @@ function initMsal(){
       localStorage.setItem(SP_CONFIG_KEY,JSON.stringify(spConfig));
       showConnectedState();startAutoSync();
     }
-  }catch(e){console.error('MSAL init error:',e);}
+    return true;
+  }catch(e){console.error('MSAL init error:',e);return false;}
 }
 async function connectToSharePoint(){
   const clientId=(document.getElementById('sp-client-id').value||'').trim();
@@ -858,8 +860,9 @@ async function connectToSharePoint(){
   localStorage.setItem(SP_CONFIG_KEY,JSON.stringify(spConfig));
   const btn=document.getElementById('btn-sp-connect');
   btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Conectando…';
-  initMsal();
   try{
+    const ready=await initMsal();
+    if(!ready)throw new Error('No se pudo inicializar MSAL');
     const resp=await msalInstance.loginPopup({scopes:['Files.ReadWrite','Sites.ReadWrite.All','User.Read']});
     currentUser=resp.account;
     showConnectedState();startAutoSync();await syncNow();
