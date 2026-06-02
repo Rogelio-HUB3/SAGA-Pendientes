@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAGA — Seguimiento de Pendientes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --saga-blue:#1a5fa8;--saga-blue-dark:#0f4380;--saga-blue-deeper:#082d59;
+  --saga-blue-soft:#e8f2fb;--saga-blue-mid:#b8d4ef;
+  --gray-50:#f4f7fb;--gray-100:#eaf0f8;--gray-150:#dde8f4;--gray-200:#c8d9ec;
+  --gray-300:#9db8d6;--gray-400:#6a8fae;--gray-500:#4a6a88;--gray-600:#30516e;
+  --gray-700:#1e3a52;--gray-800:#112233;
+  --green-100:#d8f5e8;--green-500:#1a9e58;--green-700:#0d6338;
+  --amber-100:#fef4d8;--amber-500:#d48b00;--amber-700:#8a5a00;
+  --red-100:#fde8e8;--red-500:#d93030;--red-700:#8f1f1f;
+  --purple-100:#ede9fe;--purple-500:#7c3aed;--purple-700:#4c1d95;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+  --radius:7px;--radius-lg:11px;--radius-xl:16px;
+  --shadow:0 1px 4px rgba(9,15,24,.07),0 4px 18px rgba(9,15,24,.05);
+  --shadow-md:0 4px 16px rgba(9,15,24,.12),0 12px 40px rgba(9,15,24,.08);
+}
+body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min-height:100vh;font-size:14px}
+
+/* HEADER */
+.header{background:var(--saga-blue);border-bottom:3px solid var(--saga-blue-dark);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;box-shadow:0 2px 16px rgba(9,15,24,.18)}
+.logo-wrap{display:flex;align-items:center}
+.header-divider{width:1px;height:28px;background:rgba(255,255,255,.25);margin:0 18px}
+.header-subtitle{font-size:12px;color:rgba(255,255,255,.75)}
+.header-subtitle strong{display:block;font-weight:600;font-size:13px;color:#fff}
+.header-actions{display:flex;align-items:center;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.btn svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.btn-outline-white{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.3)}
+.btn-outline-white:hover{background:rgba(255,255,255,.2)}
+.btn-white{background:#fff;color:var(--saga-blue)}
+.btn-white:hover{background:var(--saga-blue-soft)}
+.btn-ghost{background:transparent;color:var(--gray-500);border-color:var(--gray-200)}
+.btn-ghost:hover{background:var(--gray-100);color:var(--gray-700)}
+.btn-primary{background:var(--saga-blue);color:#fff}
+.btn-primary:hover{background:var(--saga-blue-dark)}
+.btn-danger{background:var(--red-100);color:var(--red-700)}
+.btn-danger:hover{background:#fecaca}
+.sync-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.7);padding:4px 11px;background:rgba(255,255,255,.12);border-radius:20px;border:1px solid rgba(255,255,255,.18);cursor:pointer}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#94a3b8}
+
+/* TOOLBAR */
+.toolbar{padding:14px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--gray-150);background:#fff}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:300px}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--gray-400);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.search-input{width:100%;padding:7px 12px 7px 32px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-700);background:#fff;outline:none;transition:all .15s}
+.search-input:focus{border-color:var(--saga-blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.filter-select{padding:7px 28px 7px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-700);background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236a8fae' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 9px center;appearance:none;outline:none;cursor:pointer;transition:all .15s}
+.filter-select:focus{border-color:var(--saga-blue)}
+.spacer{flex:1}
+.view-toggle{display:flex;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden}
+.view-btn{padding:6px 13px;background:#fff;border:none;cursor:pointer;font-size:12px;font-weight:500;color:var(--gray-400);display:flex;align-items:center;gap:5px;transition:all .15s;font-family:var(--font)}
+.view-btn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.view-btn.active{background:var(--saga-blue);color:#fff}
+.view-btn:not(:last-child){border-right:1px solid var(--gray-200)}
+
+/* METRICS */
+.metrics-wrap{padding:18px 28px 6px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.metric-card{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:14px 16px;position:relative;overflow:hidden}
+.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--saga-blue)}
+.metric-card.danger::before{background:var(--red-500)}
+.metric-card.warn::before{background:var(--amber-500)}
+.metric-card.ok::before{background:var(--green-500)}
+.metric-card.blocked::before{background:var(--purple-500)}
+.metric-label{font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:6px}
+.metric-value{font-size:28px;font-weight:700;color:var(--gray-800);line-height:1;margin-bottom:3px}
+.metric-card.danger .metric-value{color:var(--red-500)}
+.metric-card.warn .metric-value{color:var(--amber-500)}
+.metric-card.ok .metric-value{color:var(--green-500)}
+.metric-card.blocked .metric-value{color:var(--purple-500)}
+.metric-sub{font-size:11px;color:var(--gray-400)}
+
+/* SECTION */
+.section-head{display:flex;align-items:center;justify-content:space-between;padding:16px 28px 12px}
+.section-title{font-size:13px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.6px}
+.result-count{font-size:12px;color:var(--gray-400)}
+.content{padding:0 28px 48px}
+
+/* TABLE */
+.table-wrap{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow)}
+.table-scroll{overflow-x:auto}
+.tasks-table{width:100%;border-collapse:collapse}
+.tasks-table th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.7px;background:var(--gray-50);border-bottom:1px solid var(--gray-150);white-space:nowrap}
+.tasks-table th:first-child{padding-left:20px}
+.tasks-table td{padding:13px 14px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.tasks-table td:first-child{padding-left:20px}
+.tasks-table tr:last-child td{border-bottom:none}
+.tasks-table tbody tr{cursor:pointer;transition:background .1s}
+.tasks-table tbody tr:hover td{background:var(--saga-blue-soft)}
+.tasks-table tbody tr.row-overdue td{background:#fff8f8}
+.tasks-table tbody tr.row-overdue:hover td{background:var(--red-100)}
+.tasks-table tbody tr.row-near td{background:#fffdf0}
+.tasks-table tbody tr.row-near:hover td{background:var(--amber-100)}
+
+/* KANBAN */
+.kanban{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:12px}
+.kanban-col{background:var(--gray-100);border-radius:var(--radius-xl);padding:11px;min-height:180px}
+.kanban-col-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px}
+.col-label{display:flex;align-items:center;gap:6px}
+.col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.kanban-col-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--gray-600)}
+.kanban-count{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fff;color:var(--gray-500)}
+.kanban-card{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:11px 13px;margin-bottom:7px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.kanban-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.kanban-card:hover{border-color:var(--saga-blue-mid);box-shadow:var(--shadow);transform:translateY(-1px)}
+.kanban-card.prio-crítica::before{background:#7c3aed}
+.kanban-card.prio-alta::before{background:var(--red-500)}
+.kanban-card.prio-media::before{background:var(--amber-500)}
+.kanban-card.prio-baja::before{background:var(--green-500)}
+.kcard-title{font-size:12px;font-weight:500;color:var(--gray-800);margin-bottom:7px;line-height:1.45}
+.kcard-meta{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px}
+.kcard-footer{display:flex;align-items:center;justify-content:space-between}
+.kcard-assignee{font-size:11px;color:var(--gray-500);display:flex;align-items:center;gap:5px}
+.kcard-date{font-size:10px;font-family:var(--mono)}
+.kcard-date.overdue{color:var(--red-500);font-weight:600}
+.kcard-date.near{color:var(--amber-500);font-weight:600}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;line-height:1.3}
+.bs-pendiente{background:#e0f2fe;color:#0369a1}
+.bs-en_proceso{background:var(--amber-100);color:var(--amber-700)}
+.bs-bloqueado{background:var(--red-100);color:var(--red-700)}
+.bs-completado{background:var(--green-100);color:var(--green-700)}
+.bs-cancelado{background:var(--gray-100);color:var(--gray-500)}
+.bp-crítica{background:var(--purple-100);color:var(--purple-700)}
+.bp-alta{background:var(--red-100);color:var(--red-700)}
+.bp-media{background:var(--amber-100);color:var(--amber-700)}
+.bp-baja{background:var(--green-100);color:var(--green-700)}
+.bt-badge{background:var(--saga-blue-soft);color:var(--saga-blue);font-size:10px;font-weight:600}
+.blocker-badge{background:#fce7f3;color:#9d174d;font-size:10px;font-weight:600}
+
+/* AVATAR */
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--saga-blue-soft);color:var(--saga-blue);font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--saga-blue-mid)}
+.avatar-xs{width:22px;height:22px;font-size:9px}
+.date-mono{font-family:var(--mono);font-size:11px;color:var(--gray-400)}
+.date-overdue{color:var(--red-500)!important;font-weight:600}
+.date-near{color:var(--amber-500)!important;font-weight:600}
+.action-btn{width:28px;height:28px;border-radius:6px;border:1px solid transparent;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--gray-300);transition:all .15s}
+.action-btn:hover{background:var(--saga-blue-soft);color:var(--saga-blue);border-color:var(--saga-blue-mid)}
+.action-btn svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px}
+.form-input,.form-select,.form-textarea{width:100%;padding:9px 12px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13px;color:var(--gray-800);outline:none;transition:all .15s;background:#fff}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--saga-blue);box-shadow:0 0 0 3px rgba(26,95,168,.1)}
+.form-textarea{resize:vertical;min-height:76px;line-height:1.5}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236a8fae' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+.divider{height:1px;background:var(--gray-100);margin:6px 0}
+.blocker-box{background:var(--red-100);border:1px solid #fca5a5;border-radius:var(--radius);padding:10px 12px;margin-top:6px;display:none}
+.blocker-box-label{font-size:10px;font-weight:700;color:var(--red-700);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+
+/* RESP CONFIG */
+.resp-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--gray-50);border:1px solid var(--gray-150);border-radius:var(--radius-lg);transition:all .15s}
+.resp-item:hover{border-color:var(--saga-blue-mid);background:var(--saga-blue-soft)}
+.resp-avatar{width:32px;height:32px;border-radius:50%;background:var(--saga-blue-soft);border:2px solid var(--saga-blue-mid);color:var(--saga-blue);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.resp-del{width:26px;height:26px;border-radius:6px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray-300);transition:all .15s;flex-shrink:0}
+.resp-del:hover{background:var(--red-100);color:var(--red-500)}
+.resp-del svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* SYNC */
+.sync-status-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius-lg);margin-bottom:12px;border:1px solid var(--gray-150)}
+.sync-status-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sync-status-icon svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sync-row-ok{background:var(--green-100);border-color:#86efac}.sync-row-ok .sync-status-icon{background:var(--green-500);color:#fff}
+.sync-row-error{background:var(--red-100);border-color:#fca5a5}.sync-row-error .sync-status-icon{background:var(--red-500);color:#fff}
+.sync-row-pending{background:var(--amber-100);border-color:#fde68a}.sync-row-pending .sync-status-icon{background:var(--amber-500);color:#fff}
+.sync-row-idle{background:var(--gray-50);border-color:var(--gray-200)}.sync-row-idle .sync-status-icon{background:var(--gray-300);color:#fff}
+.sync-step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gray-600);padding:6px 0;border-bottom:1px solid var(--gray-100)}
+.sync-step:last-child{border-bottom:none}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--saga-blue-soft);color:var(--saga-blue);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-num.done{background:var(--green-100);color:var(--green-500)}
+.btn-sync{width:100%;padding:10px 16px;border-radius:var(--radius-lg);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:8px}
+.btn-sync svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.btn-sync-primary{background:var(--saga-blue);color:#fff}.btn-sync-primary:hover{background:var(--saga-blue-dark)}
+.btn-sync-secondary{background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-200)!important}.btn-sync-secondary:hover{background:var(--gray-200)}
+.config-note{font-size:11px;color:var(--gray-400);background:var(--gray-50);border:1px solid var(--gray-150);border-radius:var(--radius);padding:10px 12px;line-height:1.6;margin-bottom:14px}
+.config-note code{font-family:var(--mono);font-size:10px;background:var(--gray-200);padding:1px 5px;border-radius:4px;color:var(--gray-700)}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* TOAST & BANNER */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--gray-800);color:#fff;padding:12px 16px;border-radius:var(--radius-lg);font-size:13px;font-weight:500;z-index:9999;transform:translateY(60px);opacity:0;transition:all .3s ease;pointer-events:none;max-width:340px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-md)}
+.toast.show{transform:translateY(0);opacity:1}
+.toast svg{width:15px;height:15px;stroke:currentColor;stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.toast.success{background:var(--green-500)}
+.toast.error{background:var(--red-500)}
+#success-banner{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#1a9e58;color:#fff;padding:13px 32px;border-radius:99px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(26,158,88,.4);display:none;pointer-events:none;white-space:nowrap}
+.app-footer{text-align:center;padding:12px 28px;border-top:1px solid var(--gray-150);font-size:11px;color:var(--gray-400);background:#fff}
+
+/* ── SCORE VIEW ── */
+.score-wrap{display:flex;flex-direction:column;gap:20px}
+.score-period-bar{display:flex;align-items:center;gap:12px}
+.score-period-label{font-size:11px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.6px}
+.period-tabs{display:flex;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden;background:#fff}
+.period-tab{padding:6px 16px;font-size:12px;font-weight:500;color:var(--gray-500);background:transparent;border:none;cursor:pointer;font-family:var(--font);transition:all .15s}
+.period-tab.active{background:var(--saga-blue);color:#fff}
+.period-tab:not(:last-child){border-right:1px solid var(--gray-200)}
+.team-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.ts-card{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-lg);padding:12px 16px;text-align:center}
+.ts-value{font-size:22px;font-weight:700;color:var(--gray-800);line-height:1}
+.ts-label{font-size:10px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+.ts-card.highlight{background:var(--saga-blue);border-color:var(--saga-blue-dark)}
+.ts-card.highlight .ts-value{color:#fff}
+.ts-card.highlight .ts-label{color:rgba(255,255,255,.7)}
+.score-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.score-card{background:#fff;border:1px solid var(--gray-150);border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow)}
+.score-card-header{padding:16px 18px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--gray-100)}
+.score-avatar-lg{width:44px;height:44px;border-radius:50%;background:var(--saga-blue-soft);border:2.5px solid var(--saga-blue-mid);color:var(--saga-blue);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.score-name{font-size:14px;font-weight:600;color:var(--gray-800)}
+.score-total{font-size:11px;color:var(--gray-400);margin-top:1px}
+.score-pct-badge{margin-left:auto;font-size:18px;font-weight:700;padding:6px 12px;border-radius:var(--radius-lg);line-height:1}
+.pct-excellent{background:var(--green-100);color:var(--green-500)}
+.pct-good{background:var(--saga-blue-soft);color:var(--saga-blue)}
+.pct-mid{background:var(--amber-100);color:var(--amber-500)}
+.pct-low{background:var(--red-100);color:var(--red-500)}
+.score-progress-wrap{padding:12px 18px 8px}
+.progress-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.progress-label-text{font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px}
+.progress-label-pct{font-size:12px;font-weight:700;color:var(--gray-700)}
+.progress-track{height:10px;background:var(--gray-100);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.progress-fill.excellent{background:var(--green-500)}
+.progress-fill.good{background:var(--saga-blue)}
+.progress-fill.mid{background:var(--amber-500)}
+.progress-fill.low{background:var(--red-500)}
+.score-stats{display:grid;grid-template-columns:repeat(4,1fr);padding:10px 0;margin:0 18px;border-top:1px solid var(--gray-100)}
+.stat-item{text-align:center;padding:8px 4px}
+.stat-item:not(:last-child){border-right:1px solid var(--gray-100)}
+.stat-val{font-size:18px;font-weight:700;line-height:1}
+.stat-lbl{font-size:9px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.stat-item.s-done .stat-val{color:var(--green-500)}
+.stat-item.s-pending .stat-val{color:var(--saga-blue)}
+.stat-item.s-blocked .stat-val{color:var(--purple-500)}
+.stat-item.s-overdue .stat-val{color:var(--red-500)}
+.score-chart{padding:10px 18px 16px}
+.chart-title{font-size:10px;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.bar-chart{display:flex;flex-direction:column;gap:6px}
+.bar-row{display:flex;align-items:center;gap:8px}
+.bar-row-label{font-size:11px;color:var(--gray-500);width:80px;text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:18px;background:var(--gray-100);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:6px;font-size:10px;font-weight:600;color:#fff;min-width:2px;transition:width .5s ease}
+.avg-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:4px 10px;background:var(--gray-100);border-radius:20px;color:var(--gray-600);margin:0 18px 14px}
+.avg-chip svg{width:12px;height:12px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo-wrap">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 42" style="height:38px;display:block">
+      <text x="2" y="26" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="28" letter-spacing="1" fill="#ffffff">SAGA</text>
+      <text x="3" y="38" font-family="Arial,sans-serif" font-size="9.5" letter-spacing="0.3" fill="rgba(255,255,255,0.85)">+ seguros  + libres</text>
+    </svg>
+    <div class="header-divider"></div>
+    <div class="header-subtitle"><strong>Seguimiento de Pendientes</strong>Panel de gestión del despacho</div>
+  </div>
+  <div class="header-actions">
+    <div class="sync-chip" id="sync-chip">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-label">Sin conexión</span>
+    </div>
+    <button class="btn btn-outline-white" id="btn-responsables">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Responsables
+    </button>
+    <button class="btn btn-outline-white" id="btn-export">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Exportar JSON
+    </button>
+    <label class="btn btn-outline-white" style="cursor:pointer">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Importar
+      <input type="file" accept=".json" id="btn-import" style="display:none">
+    </label>
+    <button class="btn btn-white" id="btn-new">
+      <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nueva tarea
+    </button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input class="search-input" id="search" placeholder="Buscar pendiente, colaborador, póliza…">
+  </div>
+  <select class="filter-select" id="filter-responsable"><option value="">Todos los responsables</option></select>
+  <select class="filter-select" id="filter-status">
+    <option value="">Todos los estatus</option>
+    <option value="pendiente">Pendiente</option><option value="en_proceso">En proceso</option>
+    <option value="bloqueado">Bloqueado</option><option value="completado">Completado</option>
+    <option value="cancelado">Cancelado</option>
+  </select>
+  <select class="filter-select" id="filter-prioridad">
+    <option value="">Todas las prioridades</option>
+    <option value="crítica">Crítica</option><option value="alta">Alta</option>
+    <option value="media">Media</option><option value="baja">Baja</option>
+  </select>
+  <select class="filter-select" id="filter-tipo">
+    <option value="">Todos los tipos</option>
+    <option value="siniestro">Siniestro</option><option value="renovacion">Renovación</option>
+    <option value="tramite">Trámite</option><option value="cliente">Cliente</option>
+    <option value="interno">Interno</option>
+  </select>
+  <div class="spacer"></div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="view-table">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>Tabla
+    </button>
+    <button class="view-btn" id="view-kanban">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>Kanban
+    </button>
+    <button class="view-btn" id="view-score">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Score
+    </button>
+  </div>
+</div>
+
+<div class="metrics-wrap" id="metrics"></div>
+<div class="section-head">
+  <span class="section-title" id="section-title">Vista de tabla</span>
+  <span class="result-count" id="result-count"></span>
+</div>
+<div class="content" id="content"></div>
+<footer class="app-footer"><strong style="color:var(--saga-blue)">SAGA</strong> + seguros + libres &nbsp;·&nbsp; Herramienta interna de gestión &nbsp;·&nbsp; v2.0</footer>
+
+<!-- SUCCESS BANNER -->
+<div id="success-banner">✓ Cambio exitoso</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg"></span>
+</div>
+
+<!-- TASK MODAL -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(9,15,24,.5);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:580px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 40px rgba(9,15,24,.2);animation:slideUp .2s ease">
+    <div style="background:var(--saga-blue);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:16px 16px 0 0">
+      <div>
+        <div id="modal-title" style="font-size:15px;font-weight:600;color:#fff">Nueva tarea</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.65);margin-top:1px">SAGA · Seguimiento de pendientes</div>
+      </div>
+      <button id="modal-x" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:22px 24px 18px">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Descripción del pendiente *</label>
+          <input class="form-input" id="f-titulo" placeholder="Ej: Gestionar endoso póliza AUTO-2345-A">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de gestión</label>
+          <select class="form-select" id="f-tipo">
+            <option value="siniestro">🔴 Siniestro / Reclamación</option>
+            <option value="renovacion">🔵 Renovación / Vencimiento</option>
+            <option value="tramite">🟡 Trámite con aseguradora</option>
+            <option value="cliente">🟢 Atención a cliente</option>
+            <option value="interno">⚪ Proceso interno</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsable *</label>
+          <select class="form-select" id="f-responsable"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de solicitud</label>
+          <input class="form-input" type="date" id="f-fecha-sol">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha límite</label>
+          <input class="form-input" type="date" id="f-fecha-lim">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prioridad</label>
+          <select class="form-select" id="f-prioridad">
+            <option value="baja">⚪ Baja</option>
+            <option value="media">🟡 Media</option>
+            <option value="alta">🔴 Alta</option>
+            <option value="crítica">🟣 Crítica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estatus</label>
+          <select class="form-select" id="f-status">
+            <option value="pendiente">Pendiente</option>
+            <option value="en_proceso">En proceso</option>
+            <option value="bloqueado">Bloqueado</option>
+            <option value="completado">Completado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        <div class="form-group full"><div class="divider"></div></div>
+        <div class="form-group full">
+          <label class="form-label">Blocker / Dependencia externa</label>
+          <select class="form-select" id="f-blocker-tipo">
+            <option value="">Sin blocker</option>
+            <option value="aseguradora">Aseguradora</option>
+            <option value="cliente">Cliente</option>
+            <option value="ajustador">Ajustador independiente</option>
+            <option value="gobierno">Trámite gubernamental</option>
+            <option value="otro">Otro tercero</option>
+          </select>
+          <div id="blocker-box" class="blocker-box">
+            <div class="blocker-box-label">Detalle del blocker</div>
+            <input class="form-input" id="f-blocker-detalle" placeholder="Ej: Esperando dictamen GNP · Folio 990234" style="background:#fff">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">No. de póliza / expediente</label>
+          <input class="form-input" id="f-poliza" placeholder="Ej: AUTO-2345-A">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cliente / Asegurado</label>
+          <input class="form-input" id="f-cliente" placeholder="Nombre del cliente">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Notas y avances</label>
+          <textarea class="form-textarea" id="f-notas" placeholder="Contexto adicional, instrucciones, últimos avances…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:16px 24px;border-top:1px solid var(--gray-100)">
+      <button id="modal-cancel" class="btn btn-ghost">Cancelar</button>
+      <button id="modal-delete" class="btn btn-danger" style="display:none">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Eliminar
+      </button>
+      <button id="modal-save" class="btn btn-primary">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- RESPONSABLES MODAL -->
+<div id="resp-overlay" style="display:none;position:fixed;inset:0;background:rgba(9,15,24,.5);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-md);animation:slideUp .2s ease">
+    <div style="background:var(--saga-blue-deeper);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-radius:16px 16px 0 0">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#fff">Gestión de responsables</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px">Colaboradores del despacho SAGA</div>
+      </div>
+      <button id="resp-x" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="resp-list" style="padding:16px 20px;display:flex;flex-direction:column;gap:8px;min-height:60px"></div>
+    <div style="display:flex;gap:8px;padding:0 20px 18px">
+      <input class="form-input" id="new-resp-input" placeholder="Nombre del colaborador" style="flex:1">
+      <button id="resp-add" class="btn btn-primary" style="white-space:nowrap">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar
+      </button>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--gray-100);display:flex;justify-content:flex-end">
+      <button id="resp-close" class="btn btn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYNC MODAL -->
+<div id="sync-overlay" style="display:none;position:fixed;inset:0;background:rgba(9,15,24,.5);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:420px;box-shadow:var(--shadow-md);animation:slideUp .2s ease">
+    <div style="background:var(--saga-blue-deeper);padding:16px 22px;display:flex;align-items:center;justify-content:space-between;border-radius:16px 16px 0 0">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#fff">Sincronización SharePoint</div>
+        <div id="sp-status-sub" style="font-size:11px;color:rgba(255,255,255,.6);margin-top:1px">Conecta con tu cuenta Microsoft</div>
+      </div>
+      <button id="sync-x" style="width:30px;height:30px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);cursor:pointer;color:#fff;display:flex;align-items:center;justify-content:center">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="padding:20px 22px">
+      <div id="sp-status-row" class="sync-status-row sync-row-idle">
+        <div class="sync-status-icon"><svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></div>
+        <div>
+          <div id="sp-status-label" style="font-size:13px;font-weight:500;color:var(--gray-800)">Sin conectar</div>
+          <div id="sp-status-detail" style="font-size:11px;color:var(--gray-400);margin-top:1px">Inicia sesión para activar la sincronización</div>
+        </div>
+      </div>
+      <div id="sp-config-section">
+        <div class="config-note">
+          Ve a <code>portal.azure.com</code> → Microsoft Entra ID → Registros de aplicaciones → tu app → copia los IDs.<br>
+          Permisos necesarios: <code>Files.ReadWrite</code> y <code>Sites.ReadWrite.All</code>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+          <div class="form-group"><label class="form-label">Client ID</label><input class="form-input" id="sp-client-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style="font-family:var(--mono);font-size:12px"></div>
+          <div class="form-group"><label class="form-label">Tenant ID</label><input class="form-input" id="sp-tenant-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style="font-family:var(--mono);font-size:12px"></div>
+          <div class="form-group"><label class="form-label">URL del sitio SharePoint</label><input class="form-input" id="sp-site-url" placeholder="https://sagamasseguros.sharepoint.com/sites/SAGAInterno"></div>
+        </div>
+        <button id="btn-sp-connect" class="btn-sync btn-sync-primary">
+          <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Conectar con Microsoft
+        </button>
+      </div>
+      <div id="sp-connected-section" style="display:none">
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+          <div class="sync-step"><div class="step-num done">✓</div>Autenticado con Microsoft 365</div>
+          <div class="sync-step"><div class="step-num" id="step-site-num">2</div><span id="step-site-text">Verificando sitio SharePoint…</span></div>
+          <div class="sync-step"><div class="step-num" id="step-file-num">3</div><span id="step-file-text">Buscando archivo de datos…</span></div>
+        </div>
+        <button id="btn-sync-now" class="btn-sync btn-sync-primary">
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar ahora
+        </button>
+        <button id="btn-sp-disconnect" class="btn-sync btn-sync-secondary" style="margin-top:8px">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>Desconectar cuenta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY='saga_v3';
+const RESP_KEY='saga_resp_v1';
+const SP_CONFIG_KEY='saga_sp_v1';
+let tasks=[], responsables=[], currentView='table', editingId=null, _lastHash='';
+
+// ── HELPERS ──
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function uid(){return'saga_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);}
+function initials(n){return(n||'?').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();}
+function statusLabel(s){return{pendiente:'Pendiente',en_proceso:'En proceso',bloqueado:'Bloqueado',completado:'Completado',cancelado:'Cancelado'}[s]||s;}
+function tipoBadge(tipo){const m={siniestro:'🔴 Siniestro',renovacion:'🔵 Renovación',tramite:'🟡 Trámite',cliente:'🟢 Cliente',interno:'⚪ Interno'};return`<span class="badge bt-badge">${m[tipo]||tipo}</span>`;}
+function dateStatus(lim,status){
+  if(!lim||status==='completado'||status==='cancelado')return'ok';
+  const today=new Date();today.setHours(0,0,0,0);
+  const d=new Date(lim+'T00:00:00');
+  const diff=Math.floor((d-today)/(1000*60*60*24));
+  return diff<0?'overdue':diff<=3?'near':'ok';
+}
+function fmtDate(d){if(!d)return'—';const[y,m,day]=d.split('-');return`${day}/${m}/${y.slice(2)}`;}
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.className='toast'+(type?' '+type:'');
+  document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+function showBanner(msg){
+  const b=document.getElementById('success-banner');
+  b.textContent='✓ '+(msg||'Cambio exitoso');
+  b.style.display='block';
+  setTimeout(()=>b.style.display='none',2500);
+}
+
+// ── DATA ──
+function loadTasks(){
+  try{const d=localStorage.getItem(STORAGE_KEY);if(d)tasks=JSON.parse(d);}catch(e){tasks=[];}
+  if(!tasks.length)tasks=getSampleData();
+}
+function loadResponsables(){
+  try{const d=localStorage.getItem(RESP_KEY);if(d)responsables=JSON.parse(d);}catch(e){responsables=[];}
+  if(!responsables.length)responsables=[...new Set(tasks.map(t=>t.responsable).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function saveTasks(){
+  const json=JSON.stringify(tasks);
+  localStorage.setItem(STORAGE_KEY,json);
+  _lastHash=json;
+  try{
+    const now=new Date();
+    const lbl=document.getElementById('sync-label');
+    if(lbl)lbl.textContent='Guardado '+now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){}
+}
+function saveResponsables(){localStorage.setItem(RESP_KEY,JSON.stringify(responsables));}
+function getSampleData(){
+  const t=new Date(),d=n=>{const x=new Date(t);x.setDate(x.getDate()+n);return x.toISOString().split('T')[0];};
+  return[
+    {id:uid(),titulo:'Reclamación robo total — seguimiento urgente',tipo:'siniestro',responsable:'Ana García',cliente:'Lic. Fuentes Herrera',fechaSol:d(-10),fechaLim:d(-2),prioridad:'crítica',status:'bloqueado',blockerTipo:'ajustador',blockerDetalle:'Esperando dictamen ajustador · Folio ADJ-881',poliza:'AUTO-8821-A',notas:'Cliente inconforme. Seguimiento diario.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Renovación flotilla empresarial — cotizaciones',tipo:'renovacion',responsable:'Carlos López',cliente:'Grupo Logístico Torres',fechaSol:d(-5),fechaLim:d(3),prioridad:'alta',status:'en_proceso',blockerTipo:'',blockerDetalle:'',poliza:'FLOT-445',notas:'Cotizaciones a GNP, AXA y Qualitas.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Endoso incremento suma asegurada inmueble',tipo:'tramite',responsable:'María Rodríguez',cliente:'Inmobiliaria del Norte SA',fechaSol:d(-3),fechaLim:d(7),prioridad:'media',status:'pendiente',blockerTipo:'aseguradora',blockerDetalle:'En revisión GNP · Trámite 990234',poliza:'INM-3301',notas:'',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Queja por demora en pago de siniestro',tipo:'cliente',responsable:'Ana García',cliente:'Familia Vega Morales',fechaSol:d(-1),fechaLim:d(2),prioridad:'alta',status:'en_proceso',blockerTipo:'',blockerDetalle:'',poliza:'VIDA-7721',notas:'Escalar si no hay respuesta hoy.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Actualización base pólizas vencidas Q2',tipo:'interno',responsable:'Carlos López',cliente:'',fechaSol:d(-8),fechaLim:d(10),prioridad:'baja',status:'pendiente',blockerTipo:'',blockerDetalle:'',poliza:'',notas:'',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Siniestro daños a terceros — resuelto',tipo:'siniestro',responsable:'María Rodríguez',cliente:'Pedro Ramírez',fechaSol:d(-15),fechaLim:d(-5),prioridad:'alta',status:'completado',blockerTipo:'',blockerDetalle:'',poliza:'AUTO-9923',notas:'Resuelto. Pago procesado.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Renovación GMM — actualización beneficiarios',tipo:'renovacion',responsable:'Ana García',cliente:'Familia Torres Sánchez',fechaSol:d(-2),fechaLim:d(14),prioridad:'media',status:'pendiente',blockerTipo:'cliente',blockerDetalle:'Pendiente confirmación datos beneficiarios',poliza:'GMM-5512',notas:'',updatedAt:new Date().toISOString()},
+  ];
+}
+
+// ── FILTERS ──
+function getFiltered(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const fR=document.getElementById('filter-responsable').value;
+  const fS=document.getElementById('filter-status').value;
+  const fP=document.getElementById('filter-prioridad').value;
+  const fT=document.getElementById('filter-tipo').value;
+  return tasks.filter(t=>{
+    if(q&&!`${t.titulo} ${t.responsable} ${t.poliza} ${t.cliente} ${t.notas}`.toLowerCase().includes(q))return false;
+    if(fR&&t.responsable!==fR)return false;
+    if(fS&&t.status!==fS)return false;
+    if(fP&&t.prioridad!==fP)return false;
+    if(fT&&t.tipo!==fT)return false;
+    return true;
+  });
+}
+function updateResponsableFilter(){
+  const sel=document.getElementById('filter-responsable');
+  const cur=sel.value;
+  const names=[...new Set(tasks.map(t=>t.responsable).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Todos los responsables</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if(names.includes(cur))sel.value=cur;
+}
+
+// ── RENDER ──
+function renderAll(){
+  renderMetrics();
+  updateResponsableFilter();
+  const f=getFiltered();
+  const titles={table:'Vista de tabla',kanban:'Vista Kanban',score:'Score de equipo'};
+  document.getElementById('section-title').textContent=titles[currentView]||'';
+  document.getElementById('result-count').textContent=currentView!=='score'?`${f.length} de ${tasks.length} tarea${tasks.length!==1?'s':''}`:'' ;
+  if(currentView==='table')renderTable(f);
+  else if(currentView==='kanban')renderKanban(f);
+  else renderScore();
+}
+function setView(v){
+  currentView=v;
+  document.getElementById('view-table').classList.toggle('active',v==='table');
+  document.getElementById('view-kanban').classList.toggle('active',v==='kanban');
+  document.getElementById('view-score').classList.toggle('active',v==='score');
+  renderAll();
+}
+function renderMetrics(){
+  const active=tasks.filter(t=>t.status!=='completado'&&t.status!=='cancelado');
+  const blocked=tasks.filter(t=>t.status==='bloqueado');
+  const overdue=active.filter(t=>dateStatus(t.fechaLim,t.status)==='overdue');
+  const near=active.filter(t=>dateStatus(t.fechaLim,t.status)==='near');
+  const done=tasks.filter(t=>t.status==='completado');
+  const pct=tasks.length?Math.round((done.length/tasks.length)*100):0;
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric-card"><div class="metric-label">Activos</div><div class="metric-value">${active.length}</div><div class="metric-sub">en seguimiento</div></div>
+    <div class="metric-card danger"><div class="metric-label">Vencidos</div><div class="metric-value">${overdue.length}</div><div class="metric-sub">pasaron fecha límite</div></div>
+    <div class="metric-card warn"><div class="metric-label">Por vencer</div><div class="metric-value">${near.length}</div><div class="metric-sub">próximos 3 días</div></div>
+    <div class="metric-card blocked"><div class="metric-label">Bloqueados</div><div class="metric-value">${blocked.length}</div><div class="metric-sub">dependen de tercero</div></div>
+    <div class="metric-card ok"><div class="metric-label">Completados</div><div class="metric-value">${done.length}</div><div class="metric-sub">${pct}% del total</div></div>`;
+}
+function renderTable(filtered){
+  if(!filtered.length){document.getElementById('content').innerHTML='<div class="table-wrap"><div style="text-align:center;padding:40px;color:var(--gray-400)">Sin resultados — ajusta los filtros</div></div>';return;}
+  const rows=filtered.map(t=>{
+    const ds=dateStatus(t.fechaLim,t.status);
+    const rc=ds==='overdue'?'row-overdue':ds==='near'?'row-near':'';
+    const dc=ds==='overdue'?'date-overdue':ds==='near'?'date-near':'';
+    const bl=t.blockerTipo?`<span class="badge blocker-badge">⚠ ${esc(t.blockerTipo)}</span>`:'';
+    return`<tr class="${rc}" data-id="${t.id}">
+      <td style="max-width:260px">
+        <div style="font-weight:500;font-size:13px;color:var(--gray-800);margin-bottom:4px;line-height:1.4">${esc(t.titulo)}</div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center">${tipoBadge(t.tipo)}${t.poliza?`<span style="font-family:var(--mono);font-size:10px;color:var(--gray-400);background:var(--gray-100);padding:1px 6px;border-radius:4px">${esc(t.poliza)}</span>`:''}${t.cliente?`<span style="font-size:10px;color:var(--gray-400)">${esc(t.cliente)}</span>`:''}</div>
+      </td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar">${initials(t.responsable)}</div><span style="font-size:13px;white-space:nowrap">${esc(t.responsable)}</span></div></td>
+      <td><span class="date-mono">${fmtDate(t.fechaSol)}</span></td>
+      <td><span class="date-mono ${dc}">${t.fechaLim?fmtDate(t.fechaLim)+(ds==='overdue'?' ⚠':''):'—'}</span></td>
+      <td><span class="badge bp-${t.prioridad}">${t.prioridad}</span></td>
+      <td><span class="badge bs-${t.status}">${statusLabel(t.status)}</span></td>
+      <td>${bl}</td>
+      <td><button class="action-btn" data-id="${t.id}"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`<div class="table-wrap"><div class="table-scroll"><table class="tasks-table"><thead><tr><th>Pendiente / Póliza</th><th>Responsable</th><th>Solicitud</th><th>Fecha límite</th><th>Prioridad</th><th>Estatus</th><th>Blocker</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  document.querySelectorAll('.tasks-table tbody tr').forEach(tr=>tr.addEventListener('click',()=>openModal(tr.dataset.id)));
+  document.querySelectorAll('.action-btn[data-id]').forEach(btn=>{btn.addEventListener('click',e=>{e.stopPropagation();openModal(btn.dataset.id);});});
+}
+function renderKanban(filtered){
+  const cols=[{key:'pendiente',label:'Pendiente',dot:'#0369a1'},{key:'en_proceso',label:'En proceso',dot:'#d48b00'},{key:'bloqueado',label:'Bloqueado',dot:'#d93030'},{key:'completado',label:'Completado',dot:'#1a9e58'},{key:'cancelado',label:'Cancelado',dot:'#6a8fae'}];
+  const html=cols.map(col=>{
+    const ct=filtered.filter(t=>t.status===col.key);
+    const cards=ct.length?ct.map(t=>{
+      const ds=dateStatus(t.fechaLim,t.status);
+      const dc=ds==='overdue'?'overdue':ds==='near'?'near':'';
+      return`<div class="kanban-card prio-${t.prioridad}" data-id="${t.id}">
+        <div class="kcard-title">${esc(t.titulo)}</div>
+        <div class="kcard-meta">${tipoBadge(t.tipo)}<span class="badge bp-${t.prioridad}">${t.prioridad}</span>${t.blockerTipo?`<span class="badge blocker-badge">⚠ ${esc(t.blockerTipo)}</span>`:''}</div>
+        <div class="kcard-footer"><div class="kcard-assignee"><div class="avatar avatar-xs">${initials(t.responsable)}</div>${esc(t.responsable.split(' ')[0])}</div><div class="kcard-date ${dc}">${t.fechaLim?fmtDate(t.fechaLim):''}</div></div>
+      </div>`;
+    }).join(''):`<div style="padding:18px 8px;text-align:center;color:var(--gray-300);font-size:11px">Sin tareas</div>`;
+    return`<div class="kanban-col"><div class="kanban-col-header"><div class="col-label"><div class="col-dot" style="background:${col.dot}"></div><span class="kanban-col-title">${col.label}</span></div><span class="kanban-count">${ct.length}</span></div>${cards}</div>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`<div class="kanban">${html}</div>`;
+  document.querySelectorAll('.kanban-card[data-id]').forEach(card=>card.addEventListener('click',()=>openModal(card.dataset.id)));
+}
+
+// ── MODAL ──
+function openModal(id){
+  editingId=id||null;
+  const t=id?tasks.find(x=>x.id===id):null;
+  document.getElementById('modal-title').textContent=t?'Editar tarea':'Nueva tarea';
+  document.getElementById('modal-delete').style.display=t?'inline-flex':'none';
+  document.getElementById('f-titulo').value=t?t.titulo:'';
+  document.getElementById('f-tipo').value=t?t.tipo:'siniestro';
+  document.getElementById('f-fecha-sol').value=t?t.fechaSol:new Date().toISOString().split('T')[0];
+  document.getElementById('f-fecha-lim').value=t?t.fechaLim:'';
+  document.getElementById('f-prioridad').value=t?t.prioridad:'media';
+  document.getElementById('f-status').value=t?t.status:'pendiente';
+  document.getElementById('f-blocker-tipo').value=t?t.blockerTipo:'';
+  document.getElementById('f-blocker-detalle').value=t?t.blockerDetalle:'';
+  document.getElementById('f-poliza').value=t?t.poliza:'';
+  document.getElementById('f-cliente').value=t?t.cliente:'';
+  document.getElementById('f-notas').value=t?t.notas:'';
+  document.getElementById('blocker-box').style.display=(t&&t.blockerTipo)?'block':'none';
+  const rsel=document.getElementById('f-responsable');
+  const allResps=[...new Set([...responsables,...tasks.map(x=>x.responsable).filter(Boolean),...(t&&t.responsable?[t.responsable]:[])])].sort((a,b)=>a.localeCompare(b,'es'));
+  rsel.innerHTML=allResps.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+  if(t&&t.responsable)rsel.value=t.responsable;
+  else if(allResps.length)rsel.value=allResps[0];
+  document.getElementById('modal-overlay').style.display='flex';
+  setTimeout(()=>document.getElementById('f-titulo').focus(),80);
+}
+function closeModal(){
+  document.getElementById('modal-overlay').style.display='none';
+  editingId=null;
+}
+
+// ── SAVE / DELETE ──
+function doSave(){
+  const titulo=(document.getElementById('f-titulo').value||'').trim();
+  const responsable=(document.getElementById('f-responsable').value||'').trim();
+  if(!titulo){showToast('Escribe la descripción del pendiente','error');return;}
+  if(!responsable){showToast('Asigna un responsable','error');return;}
+  const wasEditing=!!editingId;
+  const taskId=editingId||uid();
+  const task={
+    id:taskId,titulo,
+    tipo:document.getElementById('f-tipo').value,
+    responsable,
+    cliente:(document.getElementById('f-cliente').value||'').trim(),
+    fechaSol:document.getElementById('f-fecha-sol').value,
+    fechaLim:document.getElementById('f-fecha-lim').value,
+    prioridad:document.getElementById('f-prioridad').value,
+    status:document.getElementById('f-status').value,
+    blockerTipo:document.getElementById('f-blocker-tipo').value,
+    blockerDetalle:(document.getElementById('f-blocker-detalle').value||'').trim(),
+    poliza:(document.getElementById('f-poliza').value||'').trim(),
+    notas:(document.getElementById('f-notas').value||'').trim(),
+    updatedAt:new Date().toISOString()
+  };
+  if(wasEditing){const i=tasks.findIndex(x=>x.id===taskId);if(i>-1)tasks[i]=task;else tasks.unshift(task);}
+  else tasks.unshift(task);
+  saveTasks();
+  closeModal();
+  renderAll();
+  showBanner(wasEditing?'Tarea actualizada':'Tarea creada');
+}
+function doDelete(){
+  if(!editingId)return;
+  if(!confirm('¿Eliminar esta tarea permanentemente?'))return;
+  tasks=tasks.filter(t=>t.id!==editingId);
+  saveTasks();
+  closeModal();
+  renderAll();
+  showBanner('Tarea eliminada');
+}
+
+// ── EXPORT / IMPORT ──
+function doExport(){
+  const blob=new Blob([JSON.stringify({app:'SAGA Pendientes',version:3,exportedAt:new Date().toISOString(),tasks},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`SAGA-pendientes-${new Date().toISOString().split('T')[0]}.json`;a.click();
+  showToast('Exportado — guarda el JSON en SharePoint para sincronizar');
+}
+function doImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      const imported=data.tasks||data;
+      if(!Array.isArray(imported))throw new Error();
+      const map=new Map(tasks.map(t=>[t.id,t]));
+      imported.forEach(t=>{if(t.id)map.set(t.id,t);});
+      tasks=[...map.values()].sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
+      saveTasks();renderAll();
+      showBanner(`${imported.length} tareas importadas`);
+    }catch{showToast('Error al leer el archivo JSON','error');}
+  };
+  reader.readAsText(file);e.target.value='';
+}
+
+// ── RESPONSABLES ──
+function openRespModal(){renderRespList();document.getElementById('resp-overlay').style.display='flex';setTimeout(()=>document.getElementById('new-resp-input').focus(),80);}
+function closeRespModal(){document.getElementById('resp-overlay').style.display='none';}
+function renderRespList(){
+  const list=document.getElementById('resp-list');
+  if(!responsables.length){list.innerHTML='<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:12px">Agrega colaboradores abajo.</div>';return;}
+  list.innerHTML=responsables.map((r,i)=>{
+    const cnt=tasks.filter(t=>t.responsable===r&&t.status!=='completado'&&t.status!=='cancelado').length;
+    return`<div class="resp-item"><div class="resp-avatar">${initials(r)}</div><span style="font-size:13px;font-weight:500;color:var(--gray-800);flex:1">${esc(r)}</span><span style="font-size:11px;color:var(--gray-400);margin-right:6px">${cnt} activa${cnt!==1?'s':''}</span><button class="resp-del" data-idx="${i}"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button></div>`;
+  }).join('');
+  list.querySelectorAll('.resp-del').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const i=parseInt(btn.dataset.idx);
+      const name=responsables[i];
+      const active=tasks.filter(t=>t.responsable===name&&t.status!=='completado'&&t.status!=='cancelado').length;
+      if(active>0&&!confirm(`${name} tiene ${active} tarea(s) activa(s). ¿Eliminar de todas formas?`))return;
+      responsables.splice(i,1);saveResponsables();renderRespList();
+    });
+  });
+}
+function addResponsable(){
+  const input=document.getElementById('new-resp-input');
+  const name=(input.value||'').trim();
+  if(!name)return;
+  if(responsables.includes(name)){showToast('Este colaborador ya existe','error');return;}
+  responsables.push(name);responsables.sort((a,b)=>a.localeCompare(b,'es'));
+  saveResponsables();renderRespList();input.value='';input.focus();
+  showToast(`${name} agregado`,'success');
+}
+
+// ── AZURE / SHAREPOINT ──
+let msalInstance=null,spConfig={},syncInterval=null,isSyncing=false,currentUser=null;
+function loadSpConfig(){
+  try{const d=localStorage.getItem(SP_CONFIG_KEY);if(d)spConfig=JSON.parse(d);}catch{}
+  if(spConfig.clientId){
+    document.getElementById('sp-client-id').value=spConfig.clientId||'';
+    document.getElementById('sp-tenant-id').value=spConfig.tenantId||'';
+    document.getElementById('sp-site-url').value=spConfig.siteUrl||'';
+    initMsal();
+  }
+}
+function openSyncPanel(){loadSpConfig();document.getElementById('sync-overlay').style.display='flex';}
+function closeSyncPanel(){document.getElementById('sync-overlay').style.display='none';}
+function initMsal(){
+  const clientId=(document.getElementById('sp-client-id').value||'').trim()||spConfig.clientId;
+  const tenantId=(document.getElementById('sp-tenant-id').value||'').trim()||spConfig.tenantId;
+  if(!clientId||!tenantId)return;
+  try{
+    msalInstance=new msal.PublicClientApplication({
+      auth:{clientId,authority:`https://login.microsoftonline.com/${tenantId}`,redirectUri:window.location.href.split('?')[0]},
+      cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
+    });
+    const accounts=msalInstance.getAllAccounts();
+    if(accounts.length>0){
+      currentUser=accounts[0];
+      spConfig.clientId=clientId;spConfig.tenantId=tenantId;
+      spConfig.siteUrl=(document.getElementById('sp-site-url').value||'').trim()||spConfig.siteUrl;
+      localStorage.setItem(SP_CONFIG_KEY,JSON.stringify(spConfig));
+      showConnectedState();startAutoSync();
+    }
+  }catch(e){console.error('MSAL init error:',e);}
+}
+async function connectToSharePoint(){
+  const clientId=(document.getElementById('sp-client-id').value||'').trim();
+  const tenantId=(document.getElementById('sp-tenant-id').value||'').trim();
+  const siteUrl=(document.getElementById('sp-site-url').value||'').trim();
+  if(!clientId||!tenantId||!siteUrl){showToast('Completa los tres campos','error');return;}
+  spConfig={clientId,tenantId,siteUrl};
+  localStorage.setItem(SP_CONFIG_KEY,JSON.stringify(spConfig));
+  const btn=document.getElementById('btn-sp-connect');
+  btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Conectando…';
+  initMsal();
+  try{
+    const resp=await msalInstance.loginPopup({scopes:['Files.ReadWrite','Sites.ReadWrite.All','User.Read']});
+    currentUser=resp.account;
+    showConnectedState();startAutoSync();await syncNow();
+    showToast('Conectado a Microsoft 365 ✓','success');
+  }catch(e){
+    btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>Conectar con Microsoft';
+    showToast('Error al conectar: '+(e.message||e),'error');
+  }
+}
+async function getToken(){
+  if(!msalInstance||!currentUser)throw new Error('No autenticado');
+  try{const r=await msalInstance.acquireTokenSilent({scopes:['Files.ReadWrite','Sites.ReadWrite.All'],account:currentUser});return r.accessToken;}
+  catch{const r=await msalInstance.acquireTokenPopup({scopes:['Files.ReadWrite','Sites.ReadWrite.All']});return r.accessToken;}
+}
+async function getSiteInfo(token){
+  const url=spConfig.siteUrl.replace(/\/$/,'');
+  const hostname=new URL(url).hostname;
+  const path=new URL(url).pathname;
+  const r=await fetch(`https://graph.microsoft.com/v1.0/sites/${hostname}:${path}`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!r.ok)throw new Error(`Sitio no encontrado (${r.status})`);
+  const site=await r.json();
+  const dr=await fetch(`https://graph.microsoft.com/v1.0/sites/${site.id}/drive`,{headers:{Authorization:`Bearer ${token}`}});
+  if(!dr.ok)throw new Error('No se pudo acceder al drive');
+  const drive=await dr.json();
+  return{siteId:site.id,driveId:drive.id};
+}
+async function readSpFile(token,driveId){
+  const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/SAGA-pendientes.json:/content`,{headers:{Authorization:`Bearer ${token}`}});
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error(`Error leyendo archivo (${r.status})`);
+  return await r.json();
+}
+async function writeSpFile(token,driveId){
+  const body=JSON.stringify({app:'SAGA Pendientes',version:3,savedAt:new Date().toISOString(),tasks,responsables});
+  const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/SAGA-pendientes.json:/content`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body});
+  if(!r.ok)throw new Error(`Error guardando archivo (${r.status})`);
+}
+async function syncNow(){
+  if(isSyncing||!msalInstance||!currentUser)return;
+  isSyncing=true;setSyncDot('syncing');
+  const btn=document.getElementById('btn-sync-now');
+  if(btn){btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Sincronizando…';}
+  try{
+    const token=await getToken();
+    setStep('site','pending','Conectando a SharePoint…');
+    const{siteId,driveId}=await getSiteInfo(token);
+    spConfig.driveId=driveId;
+    setStep('site','done','Sitio verificado');
+    setStep('file','pending','Leyendo datos remotos…');
+    const remote=await readSpFile(token,driveId);
+    if(remote&&Array.isArray(remote.tasks)){
+      const map=new Map(tasks.map(t=>[t.id,t]));
+      remote.tasks.forEach(rt=>{const local=map.get(rt.id);if(!local||(rt.updatedAt||'')>(local.updatedAt||''))map.set(rt.id,rt);});
+      tasks=[...map.values()].sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
+      if(remote.responsables&&Array.isArray(remote.responsables)){
+        responsables=[...new Set([...responsables,...remote.responsables])].sort((a,b)=>a.localeCompare(b,'es'));
+        saveResponsables();
+      }
+    }
+    saveTasks();
+    setStep('file','done',`Datos fusionados · ${tasks.length} tareas`);
+    await writeSpFile(token,driveId);
+    renderAll();
+    const now=new Date();
+    const timeStr=now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+    setSyncDot('ok');
+    document.getElementById('sync-label').textContent='Sync '+timeStr;
+    document.getElementById('sp-status-sub').textContent='Última sync: '+timeStr;
+    setSpStatusRow('ok',currentUser.name||currentUser.username,'Sincronizado con SharePoint · '+timeStr);
+  }catch(e){
+    setSyncDot('error');
+    setSpStatusRow('error','Error de sincronización',e.message||String(e));
+    showToast('Error al sincronizar: '+(e.message||e),'error');
+  }finally{
+    isSyncing=false;
+    if(btn){btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>Sincronizar ahora';}
+  }
+}
+function startAutoSync(){if(syncInterval)clearInterval(syncInterval);syncInterval=setInterval(syncNow,30000);}
+function disconnectSharePoint(){
+  if(!confirm('¿Desconectar la cuenta Microsoft?'))return;
+  if(syncInterval)clearInterval(syncInterval);
+  if(msalInstance&&currentUser){try{msalInstance.logoutPopup({account:currentUser});}catch{}}
+  msalInstance=null;currentUser=null;spConfig={};
+  localStorage.removeItem(SP_CONFIG_KEY);
+  document.getElementById('sp-config-section').style.display='block';
+  document.getElementById('sp-connected-section').style.display='none';
+  document.getElementById('sp-client-id').value='';
+  document.getElementById('sp-tenant-id').value='';
+  document.getElementById('sp-site-url').value='';
+  setSyncDot('idle');
+  document.getElementById('sync-label').textContent='Sin conexión';
+  setSpStatusRow('idle','Sin conectar','Inicia sesión para activar la sincronización');
+  showToast('Cuenta desconectada');
+}
+function showConnectedState(){
+  document.getElementById('sp-config-section').style.display='none';
+  document.getElementById('sp-connected-section').style.display='block';
+  setSpStatusRow('ok',currentUser?(currentUser.name||currentUser.username):'Conectado','Cuenta Microsoft vinculada');
+  setSyncDot('ok');document.getElementById('sync-label').textContent='Conectado';
+}
+function setSpStatusRow(type,label,detail){
+  const row=document.getElementById('sp-status-row');
+  row.className='sync-status-row sync-row-'+(type==='syncing'?'pending':type);
+  document.getElementById('sp-status-label').textContent=label;
+  document.getElementById('sp-status-detail').textContent=detail;
+}
+function setSyncDot(state){
+  const dot=document.getElementById('sync-dot');
+  const colors={ok:'#4ade80',error:'#f87171',syncing:'#fbbf24',idle:'#94a3b8'};
+  dot.style.background=colors[state]||colors.idle;
+  dot.style.boxShadow=state==='ok'?'0 0 6px #4ade80':'none';
+}
+function setStep(id,state,text){
+  const num=document.getElementById('step-'+id+'-num');
+  const txt=document.getElementById('step-'+id+'-text');
+  if(num){num.className='step-num'+(state==='done'?' done':'');num.textContent=state==='done'?'✓':(id==='site'?'2':'3');}
+  if(txt)txt.textContent=text;
+}
+
+
+// ── SCORE VIEW ──
+let scorePeriod='month';
+
+function taskInPeriod(task,period){
+  if(!task.fechaSol)return true;
+  const now=new Date();now.setHours(0,0,0,0);
+  let start=new Date(now);
+  if(period==='week'){const day=now.getDay();start.setDate(now.getDate()-(day===0?6:day-1));}
+  else if(period==='month'){start=new Date(now.getFullYear(),now.getMonth(),1);}
+  else{const q=Math.floor(now.getMonth()/3);start=new Date(now.getFullYear(),q*3,1);}
+  const d=new Date(task.fechaSol+'T00:00:00');
+  return d>=start&&d<=new Date(now.getTime()+86400000);
+}
+
+function avgDays(arr){
+  const r=arr.filter(t=>t.fechaSol&&t.fechaLim&&t.status==='completado');
+  if(!r.length)return null;
+  return Math.round(r.reduce((s,t)=>s+Math.max(0,Math.floor((new Date(t.fechaLim+'T00:00:00')-new Date(t.fechaSol+'T00:00:00'))/(86400000))),0)/r.length);
+}
+
+function renderScore(){
+  const pt=tasks.filter(t=>taskInPeriod(t,scorePeriod));
+  const allNames=[...new Set([...tasks.map(t=>t.responsable).filter(Boolean),...responsables])].sort((a,b)=>a.localeCompare(b,'es'));
+  const periodLabel={week:'Esta semana',month:'Este mes',quarter:'Este trimestre'}[scorePeriod];
+  const teamDone=pt.filter(t=>t.status==='completado').length;
+  const teamPct=pt.length?Math.round((teamDone/pt.length)*100):0;
+  const teamOverdue=pt.filter(t=>t.status!=='completado'&&t.status!=='cancelado'&&dateStatus(t.fechaLim,t.status)==='overdue').length;
+  const teamBlocked=pt.filter(t=>t.status==='bloqueado').length;
+
+  function pc(p){return p>=80?'excellent':p>=50?'good':p>=25?'mid':'low';}
+  function pb(p){return p>=80?'pct-excellent':p>=50?'pct-good':p>=25?'pct-mid':'pct-low';}
+  const tipoColors={siniestro:'#d93030',renovacion:'#1a5fa8',tramite:'#d48b00',cliente:'#1a9e58',interno:'#6a8fae'};
+  const tipoLabels={siniestro:'Siniestros',renovacion:'Renovaciones',tramite:'Trámites',cliente:'Clientes',interno:'Internos'};
+
+  const collabs=allNames.map(name=>{
+    const mine=pt.filter(t=>t.responsable===name);
+    const done=mine.filter(t=>t.status==='completado').length;
+    const active=mine.filter(t=>t.status!=='cancelado').length;
+    const blocked=mine.filter(t=>t.status==='bloqueado').length;
+    const overdue=mine.filter(t=>t.status!=='completado'&&t.status!=='cancelado'&&dateStatus(t.fechaLim,t.status)==='overdue').length;
+    const pending=mine.filter(t=>t.status==='pendiente'||t.status==='en_proceso').length;
+    const pct=active?Math.round((done/active)*100):0;
+    const byTipo={siniestro:0,renovacion:0,tramite:0,cliente:0,interno:0};
+    mine.forEach(t=>{if(byTipo[t.tipo]!==undefined)byTipo[t.tipo]++;});
+    return{name,total:mine.length,active,done,pending,blocked,overdue,pct,avg:avgDays(mine),byTipo};
+  }).sort((a,b)=>b.pct-a.pct||b.done-a.done);
+
+  const cards=collabs.map((c,i)=>{
+    const medal=i===0&&c.done>0?'🥇 ':i===1&&c.done>0?'🥈 ':i===2&&c.done>0?'🥉 ':'';
+    const maxT=Math.max(...Object.values(c.byTipo),1);
+    const bars=Object.entries(c.byTipo).filter(([,v])=>v>0).map(([tipo,val])=>
+      `<div class="bar-row"><span class="bar-row-label">${tipoLabels[tipo]}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round((val/maxT)*100)}%;background:${tipoColors[tipo]}">${val}</div></div></div>`
+    ).join('');
+    return`<div class="score-card">
+      <div class="score-card-header">
+        <div class="score-avatar-lg">${initials(c.name)}</div>
+        <div><div class="score-name">${medal}${esc(c.name)}</div><div class="score-total">${c.active} tarea${c.active!==1?'s':''} — ${periodLabel}</div></div>
+        <div class="score-pct-badge ${pb(c.pct)}">${c.pct}%</div>
+      </div>
+      <div class="score-progress-wrap">
+        <div class="progress-label"><span class="progress-label-text">Completado</span><span class="progress-label-pct">${c.done} de ${c.active}</span></div>
+        <div class="progress-track"><div class="progress-fill ${pc(c.pct)}" style="width:${c.pct}%"></div></div>
+      </div>
+      <div class="score-stats">
+        <div class="stat-item s-done"><div class="stat-val">${c.done}</div><div class="stat-lbl">Completadas</div></div>
+        <div class="stat-item s-pending"><div class="stat-val">${c.pending}</div><div class="stat-lbl">Pendientes</div></div>
+        <div class="stat-item s-blocked"><div class="stat-val">${c.blocked}</div><div class="stat-lbl">Bloqueadas</div></div>
+        <div class="stat-item s-overdue"><div class="stat-val">${c.overdue}</div><div class="stat-lbl">Vencidas</div></div>
+      </div>
+      <div class="avg-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Tiempo prom. resolución: <strong style="margin-left:3px">${c.avg!==null?c.avg+' día'+(c.avg!==1?'s':''):'Sin datos'}</strong>
+      </div>
+      <div class="score-chart">
+        <div class="chart-title">Tareas por tipo</div>
+        <div class="bar-chart">${bars||'<div style="font-size:11px;color:var(--gray-300)">Sin tareas en este período</div>'}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML=`<div class="score-wrap">
+    <div class="score-period-bar">
+      <span class="score-period-label">Período:</span>
+      <div class="period-tabs">
+        <button class="period-tab ${scorePeriod==='week'?'active':''}" data-period="week">Esta semana</button>
+        <button class="period-tab ${scorePeriod==='month'?'active':''}" data-period="month">Este mes</button>
+        <button class="period-tab ${scorePeriod==='quarter'?'active':''}" data-period="quarter">Este trimestre</button>
+      </div>
+    </div>
+    <div class="team-summary">
+      <div class="ts-card highlight"><div class="ts-value">${teamPct}%</div><div class="ts-label">% Equipo</div></div>
+      <div class="ts-card"><div class="ts-value">${pt.length}</div><div class="ts-label">Total tareas</div></div>
+      <div class="ts-card"><div class="ts-value" style="color:var(--green-500)">${teamDone}</div><div class="ts-label">Completadas</div></div>
+      <div class="ts-card"><div class="ts-value" style="color:var(--red-500)">${teamOverdue}</div><div class="ts-label">Vencidas</div></div>
+      <div class="ts-card"><div class="ts-value" style="color:var(--purple-500)">${teamBlocked}</div><div class="ts-label">Bloqueadas</div></div>
+    </div>
+    <div class="score-grid">${cards||'<div style="color:var(--gray-400);font-size:13px;padding:20px">Sin responsables registrados.</div>'}</div>
+  </div>`;
+
+  // Wire period tabs via addEventListener (no inline onclick)
+  document.querySelectorAll('.period-tab[data-period]').forEach(btn=>{
+    btn.addEventListener('click',()=>{scorePeriod=btn.dataset.period;renderScore();});
+  });
+}
+
+// ── AUTO REFRESH (between tabs) ──
+setInterval(()=>{
+  if(document.getElementById('modal-overlay').style.display==='flex')return;
+  if(document.getElementById('resp-overlay').style.display==='flex')return;
+  const cur=localStorage.getItem(STORAGE_KEY)||'';
+  if(cur&&cur!==_lastHash){
+    _lastHash=cur;
+    try{const loaded=JSON.parse(cur);tasks=loaded;renderAll();}catch{}
+  }
+},7000);
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded',()=>{
+  loadTasks();
+  loadResponsables();
+  _lastHash=JSON.stringify(tasks);
+
+  document.getElementById('btn-new').addEventListener('click',()=>openModal());
+  document.getElementById('btn-responsables').addEventListener('click',openRespModal);
+  document.getElementById('btn-export').addEventListener('click',doExport);
+  document.getElementById('btn-import').addEventListener('change',doImport);
+  document.getElementById('sync-chip').addEventListener('click',openSyncPanel);
+  document.getElementById('modal-x').addEventListener('click',closeModal);
+  document.getElementById('modal-cancel').addEventListener('click',closeModal);
+  document.getElementById('modal-save').addEventListener('click',doSave);
+  document.getElementById('modal-delete').addEventListener('click',doDelete);
+  document.getElementById('f-blocker-tipo').addEventListener('change',()=>{
+    document.getElementById('blocker-box').style.display=document.getElementById('f-blocker-tipo').value?'block':'none';
+  });
+  document.getElementById('resp-x').addEventListener('click',closeRespModal);
+  document.getElementById('resp-close').addEventListener('click',closeRespModal);
+  document.getElementById('resp-add').addEventListener('click',addResponsable);
+  document.getElementById('new-resp-input').addEventListener('keydown',e=>{if(e.key==='Enter')addResponsable();});
+  document.getElementById('sync-x').addEventListener('click',closeSyncPanel);
+  document.getElementById('btn-sp-connect').addEventListener('click',connectToSharePoint);
+  document.getElementById('btn-sync-now').addEventListener('click',syncNow);
+  document.getElementById('btn-sp-disconnect').addEventListener('click',disconnectSharePoint);
+  document.getElementById('view-table').addEventListener('click',()=>setView('table'));
+  document.getElementById('view-kanban').addEventListener('click',()=>setView('kanban'));
+  document.getElementById('view-score').addEventListener('click',()=>setView('score'));
+  document.getElementById('search').addEventListener('input',renderAll);
+  document.getElementById('filter-responsable').addEventListener('change',renderAll);
+  document.getElementById('filter-status').addEventListener('change',renderAll);
+  document.getElementById('filter-prioridad').addEventListener('change',renderAll);
+  document.getElementById('filter-tipo').addEventListener('change',renderAll);
+
+  renderAll();
+});
+</script>
+</body>
+</html>
