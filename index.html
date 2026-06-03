@@ -1144,4 +1144,15 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('btn-sp-disconnect').addEventListener('click',disconnectSharePoint);
   document.getElementById('view-table').addEventListener('click',()=>setView('table'));
   document.getElementById('view-kanban').addEventListener('click',()=>setView('kanban'));
-  document.getElementById(
+  document.getElementById('view-score').addEventListener('click',()=>setView('score'));
+  document.getElementById('search').addEventListener('input',renderAll);
+  document.getElementById('filter-responsable').addEventListener('change',renderAll);
+  document.getElementById('filter-status').addEventListener('change',renderAll);
+  document.getElementById('filter-prioridad').addEventListener('change',renderAll);
+  document.getElementById('filter-tipo').addEventListener('change',renderAll);
+
+  renderAll();
+});
+</script>
+</body>
+</html>
