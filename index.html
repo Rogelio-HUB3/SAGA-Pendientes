@@ -527,7 +527,7 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
 const STORAGE_KEY='saga_v3';
 const RESP_KEY='saga_resp_v1';
 const SP_CONFIG_KEY='saga_sp_v1';
-let tasks=[], responsables=[], currentView='table', editingId=null, _lastHash='';
+let tasks=[], responsables=[], deletedIds={}, currentView='table', editingId=null, _lastHash='';
 
 // ── HELPERS ──
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -560,6 +560,7 @@ function showBanner(msg){
 // ── DATA ──
 function loadTasks(){
   try{const d=localStorage.getItem(STORAGE_KEY);if(d)tasks=JSON.parse(d);}catch(e){tasks=[];}
+  try{const d=localStorage.getItem(STORAGE_KEY+'_deleted');if(d)deletedIds=JSON.parse(d);}catch(e){deletedIds={};}
   if(!tasks.length)tasks=getSampleData();
 }
 function loadResponsables(){
@@ -569,6 +570,7 @@ function loadResponsables(){
 function saveTasks(){
   const json=JSON.stringify(tasks);
   localStorage.setItem(STORAGE_KEY,json);
+  localStorage.setItem(STORAGE_KEY+'_deleted',JSON.stringify(deletedIds));
   _lastHash=json;
   try{
     const now=new Date();
@@ -755,6 +757,8 @@ function doSave(){
 function doDelete(){
   if(!editingId)return;
   if(!confirm('¿Eliminar esta tarea permanentemente?'))return;
+  // Mark as deleted with timestamp (tombstone)
+  deletedIds[editingId]=new Date().toISOString();
   tasks=tasks.filter(t=>t.id!==editingId);
   saveTasks();
   closeModal();
@@ -913,7 +917,7 @@ async function readSpFile(token,driveId){
   return await r.json();
 }
 async function writeSpFile(token,driveId){
-  const body=JSON.stringify({app:'SAGA Pendientes',version:3,savedAt:new Date().toISOString(),tasks,responsables});
+  const body=JSON.stringify({app:'SAGA Pendientes',version:3,savedAt:new Date().toISOString(),tasks,responsables,deletedIds});
   const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/SAGA-pendientes.json:/content`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body});
   if(!r.ok)throw new Error(`Error guardando archivo (${r.status})`);
 }
@@ -931,9 +935,25 @@ async function syncNow(){
     setStep('file','pending','Leyendo datos remotos…');
     const remote=await readSpFile(token,driveId);
     if(remote&&Array.isArray(remote.tasks)){
+      // Merge deletedIds from remote (union — deletions win)
+      if(remote.deletedIds&&typeof remote.deletedIds==='object'){
+        Object.entries(remote.deletedIds).forEach(([id,ts])=>{
+          if(!deletedIds[id]||ts>deletedIds[id])deletedIds[id]=ts;
+        });
+        localStorage.setItem(STORAGE_KEY+'_deleted',JSON.stringify(deletedIds));
+      }
+      // Merge tasks — skip any that are in deletedIds
       const map=new Map(tasks.map(t=>[t.id,t]));
-      remote.tasks.forEach(rt=>{const local=map.get(rt.id);if(!local||(rt.updatedAt||'')>(local.updatedAt||''))map.set(rt.id,rt);});
-      tasks=[...map.values()].sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
+      remote.tasks.forEach(rt=>{
+        // Skip if deleted (and deletion is newer than remote update)
+        if(deletedIds[rt.id]&&deletedIds[rt.id]>=(rt.updatedAt||''))return;
+        const local=map.get(rt.id);
+        if(!local||(rt.updatedAt||'')>(local.updatedAt||''))map.set(rt.id,rt);
+      });
+      // Also remove locally any task that remote says is deleted
+      tasks=[...map.values()]
+        .filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id])
+        .sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
       if(remote.responsables&&Array.isArray(remote.responsables)){
         responsables=[...new Set([...responsables,...remote.responsables])].sort((a,b)=>a.localeCompare(b,'es'));
         saveResponsables();
@@ -1112,7 +1132,11 @@ setInterval(()=>{
   const cur=localStorage.getItem(STORAGE_KEY)||'';
   if(cur&&cur!==_lastHash){
     _lastHash=cur;
-    try{const loaded=JSON.parse(cur);tasks=loaded;renderAll();}catch{}
+    try{
+      const loaded=JSON.parse(cur);
+      tasks=loaded.filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id]);
+      renderAll();
+    }catch{}
   }
 },7000);
 
