@@ -527,6 +527,7 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
 const STORAGE_KEY='saga_v3';
 const RESP_KEY='saga_resp_v1';
 const SP_CONFIG_KEY='saga_sp_v1';
+const SYNCED_KEY='saga_synced_v1'; // flag: has this browser ever synced?
 let tasks=[], responsables=[], deletedIds={}, deletedResponsables={}, currentView='table', editingId=null, _lastHash='';
 
 // ── HELPERS ──
@@ -946,44 +947,54 @@ async function syncNow(){
     setStep('file','pending','Leyendo datos remotos…');
     const remote=await readSpFile(token,driveId);
     if(remote&&Array.isArray(remote.tasks)){
-      // Merge deletedIds from remote (union — deletions win)
+      const isFirstSync=!localStorage.getItem(SYNCED_KEY);
+
+      // Merge tombstones from remote (deletions always win)
       if(remote.deletedIds&&typeof remote.deletedIds==='object'){
         Object.entries(remote.deletedIds).forEach(([id,ts])=>{
           if(!deletedIds[id]||ts>deletedIds[id])deletedIds[id]=ts;
         });
         localStorage.setItem(STORAGE_KEY+'_deleted',JSON.stringify(deletedIds));
       }
-      // Merge tasks — skip any that are in deletedIds
-      const map=new Map(tasks.map(t=>[t.id,t]));
-      remote.tasks.forEach(rt=>{
-        // Skip if deleted (and deletion is newer than remote update)
-        if(deletedIds[rt.id]&&deletedIds[rt.id]>=(rt.updatedAt||''))return;
-        const local=map.get(rt.id);
-        if(!local||(rt.updatedAt||'')>(local.updatedAt||''))map.set(rt.id,rt);
-      });
-      // Also remove locally any task that remote says is deleted
-      tasks=[...map.values()]
-        .filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id])
-        .sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
-      if(remote.responsables&&Array.isArray(remote.responsables)){
-        // Merge deletedResponsables — union of both (deletions always win)
-        if(remote.deletedResponsables&&typeof remote.deletedResponsables==='object'){
-          Object.entries(remote.deletedResponsables).forEach(([name,ts])=>{
-            if(!deletedResponsables[name]||ts>deletedResponsables[name])deletedResponsables[name]=ts;
-          });
-        }
-        // Add remote responsables that are NOT in tombstone and NOT already local
-        const remoteNew=remote.responsables.filter(name=>
-          !deletedResponsables[name] && !responsables.includes(name)
-        );
-        if(remoteNew.length>0){
-          responsables=[...new Set([...responsables,...remoteNew])]
+      if(remote.deletedResponsables&&typeof remote.deletedResponsables==='object'){
+        Object.entries(remote.deletedResponsables).forEach(([name,ts])=>{
+          if(!deletedResponsables[name]||ts>deletedResponsables[name])deletedResponsables[name]=ts;
+        });
+      }
+
+      if(isFirstSync){
+        // First time this browser syncs — use remote data directly, discard local sample data
+        tasks=remote.tasks
+          .filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id])
+          .sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
+        if(remote.responsables&&Array.isArray(remote.responsables)){
+          responsables=remote.responsables
             .filter(name=>!deletedResponsables[name])
             .sort((a,b)=>a.localeCompare(b,'es'));
           saveResponsables();
-        } else {
-          // Still save to persist any tombstone updates from remote
-          localStorage.setItem(RESP_KEY+'_deleted',JSON.stringify(deletedResponsables));
+        }
+        localStorage.setItem(SYNCED_KEY,'1');
+      } else {
+        // Returning browser — merge local + remote
+        const map=new Map(tasks.map(t=>[t.id,t]));
+        remote.tasks.forEach(rt=>{
+          if(deletedIds[rt.id]&&deletedIds[rt.id]>=(rt.updatedAt||''))return;
+          const local=map.get(rt.id);
+          if(!local||(rt.updatedAt||'')>(local.updatedAt||''))map.set(rt.id,rt);
+        });
+        tasks=[...map.values()]
+          .filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id])
+          .sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
+        if(remote.responsables&&Array.isArray(remote.responsables)){
+          const remoteNew=remote.responsables.filter(n=>!deletedResponsables[n]&&!responsables.includes(n));
+          if(remoteNew.length>0){
+            responsables=[...new Set([...responsables,...remoteNew])]
+              .filter(n=>!deletedResponsables[n])
+              .sort((a,b)=>a.localeCompare(b,'es'));
+            saveResponsables();
+          } else {
+            localStorage.setItem(RESP_KEY+'_deleted',JSON.stringify(deletedResponsables));
+          }
         }
       }
     }
