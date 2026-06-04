@@ -527,7 +527,7 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
 const STORAGE_KEY='saga_v3';
 const RESP_KEY='saga_resp_v1';
 const SP_CONFIG_KEY='saga_sp_v1';
-let tasks=[], responsables=[], deletedIds={}, currentView='table', editingId=null, _lastHash='';
+let tasks=[], responsables=[], deletedIds={}, deletedResponsables={}, currentView='table', editingId=null, _lastHash='';
 
 // ── HELPERS ──
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -561,6 +561,7 @@ function showBanner(msg){
 function loadTasks(){
   try{const d=localStorage.getItem(STORAGE_KEY);if(d)tasks=JSON.parse(d);}catch(e){tasks=[];}
   try{const d=localStorage.getItem(STORAGE_KEY+'_deleted');if(d)deletedIds=JSON.parse(d);}catch(e){deletedIds={};}
+  try{const d=localStorage.getItem(RESP_KEY+'_deleted');if(d)deletedResponsables=JSON.parse(d);}catch(e){deletedResponsables={};}
   if(!tasks.length)tasks=getSampleData();
 }
 function loadResponsables(){
@@ -578,17 +579,16 @@ function saveTasks(){
     if(lbl)lbl.textContent='Guardado '+now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
   }catch(e){}
 }
-function saveResponsables(){localStorage.setItem(RESP_KEY,JSON.stringify(responsables));}
+function saveResponsables(){
+  localStorage.setItem(RESP_KEY,JSON.stringify(responsables));
+  localStorage.setItem(RESP_KEY+'_deleted',JSON.stringify(deletedResponsables));
+}
 function getSampleData(){
   const t=new Date(),d=n=>{const x=new Date(t);x.setDate(x.getDate()+n);return x.toISOString().split('T')[0];};
   return[
-    {id:uid(),titulo:'Reclamación robo total — seguimiento urgente',tipo:'siniestro',responsable:'Ana García',cliente:'Lic. Fuentes Herrera',fechaSol:d(-10),fechaLim:d(-2),prioridad:'crítica',status:'bloqueado',blockerTipo:'ajustador',blockerDetalle:'Esperando dictamen ajustador · Folio ADJ-881',poliza:'AUTO-8821-A',notas:'Cliente inconforme. Seguimiento diario.',updatedAt:new Date().toISOString()},
-    {id:uid(),titulo:'Renovación flotilla empresarial — cotizaciones',tipo:'renovacion',responsable:'Carlos López',cliente:'Grupo Logístico Torres',fechaSol:d(-5),fechaLim:d(3),prioridad:'alta',status:'en_proceso',blockerTipo:'',blockerDetalle:'',poliza:'FLOT-445',notas:'Cotizaciones a GNP, AXA y Qualitas.',updatedAt:new Date().toISOString()},
-    {id:uid(),titulo:'Endoso incremento suma asegurada inmueble',tipo:'tramite',responsable:'María Rodríguez',cliente:'Inmobiliaria del Norte SA',fechaSol:d(-3),fechaLim:d(7),prioridad:'media',status:'pendiente',blockerTipo:'aseguradora',blockerDetalle:'En revisión GNP · Trámite 990234',poliza:'INM-3301',notas:'',updatedAt:new Date().toISOString()},
-    {id:uid(),titulo:'Queja por demora en pago de siniestro',tipo:'cliente',responsable:'Ana García',cliente:'Familia Vega Morales',fechaSol:d(-1),fechaLim:d(2),prioridad:'alta',status:'en_proceso',blockerTipo:'',blockerDetalle:'',poliza:'VIDA-7721',notas:'Escalar si no hay respuesta hoy.',updatedAt:new Date().toISOString()},
-    {id:uid(),titulo:'Actualización base pólizas vencidas Q2',tipo:'interno',responsable:'Carlos López',cliente:'',fechaSol:d(-8),fechaLim:d(10),prioridad:'baja',status:'pendiente',blockerTipo:'',blockerDetalle:'',poliza:'',notas:'',updatedAt:new Date().toISOString()},
-    {id:uid(),titulo:'Siniestro daños a terceros — resuelto',tipo:'siniestro',responsable:'María Rodríguez',cliente:'Pedro Ramírez',fechaSol:d(-15),fechaLim:d(-5),prioridad:'alta',status:'completado',blockerTipo:'',blockerDetalle:'',poliza:'AUTO-9923',notas:'Resuelto. Pago procesado.',updatedAt:new Date().toISOString()},
-    {id:uid(),titulo:'Renovación GMM — actualización beneficiarios',tipo:'renovacion',responsable:'Ana García',cliente:'Familia Torres Sánchez',fechaSol:d(-2),fechaLim:d(14),prioridad:'media',status:'pendiente',blockerTipo:'cliente',blockerDetalle:'Pendiente confirmación datos beneficiarios',poliza:'GMM-5512',notas:'',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Ejemplo: Renovación de póliza',tipo:'renovacion',responsable:'Responsable 1',cliente:'Cliente ejemplo',fechaSol:d(-3),fechaLim:d(7),prioridad:'media',status:'pendiente',blockerTipo:'',blockerDetalle:'',poliza:'POL-0001',notas:'Esta es una tarea de ejemplo. Puedes editarla o eliminarla.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Ejemplo: Trámite con aseguradora',tipo:'tramite',responsable:'Responsable 2',cliente:'Cliente ejemplo',fechaSol:d(-1),fechaLim:d(5),prioridad:'alta',status:'en_proceso',blockerTipo:'aseguradora',blockerDetalle:'Ejemplo de blocker externo',poliza:'POL-0002',notas:'Esta es una tarea de ejemplo. Puedes editarla o eliminarla.',updatedAt:new Date().toISOString()},
+    {id:uid(),titulo:'Ejemplo: Atención a cliente',tipo:'cliente',responsable:'Responsable 1',cliente:'Cliente ejemplo',fechaSol:d(-2),fechaLim:d(3),prioridad:'baja',status:'pendiente',blockerTipo:'',blockerDetalle:'',poliza:'',notas:'Esta es una tarea de ejemplo. Puedes editarla o eliminarla.',updatedAt:new Date().toISOString()},
   ];
 }
 
@@ -816,6 +816,8 @@ function addResponsable(){
   const name=(input.value||'').trim();
   if(!name)return;
   if(responsables.includes(name)){showToast('Este colaborador ya existe','error');return;}
+  // If previously deleted, remove from tombstone on re-add
+  if(deletedResponsables[name])delete deletedResponsables[name];
   responsables.push(name);responsables.sort((a,b)=>a.localeCompare(b,'es'));
   saveResponsables();renderRespList();input.value='';input.focus();
   showToast(`${name} agregado`,'success');
@@ -917,7 +919,7 @@ async function readSpFile(token,driveId){
   return await r.json();
 }
 async function writeSpFile(token,driveId){
-  const body=JSON.stringify({app:'SAGA Pendientes',version:3,savedAt:new Date().toISOString(),tasks,responsables,deletedIds});
+  const body=JSON.stringify({app:'SAGA Pendientes',version:3,savedAt:new Date().toISOString(),tasks,responsables,deletedIds,deletedResponsables});
   const r=await fetch(`https://graph.microsoft.com/v1.0/drives/${driveId}/root:/SAGA-pendientes.json:/content`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body});
   if(!r.ok)throw new Error(`Error guardando archivo (${r.status})`);
 }
@@ -955,7 +957,17 @@ async function syncNow(){
         .filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id])
         .sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
       if(remote.responsables&&Array.isArray(remote.responsables)){
-        responsables=[...new Set([...responsables,...remote.responsables])].sort((a,b)=>a.localeCompare(b,'es'));
+        // Merge deletedResponsables from remote
+        if(remote.deletedResponsables&&typeof remote.deletedResponsables==='object'){
+          Object.entries(remote.deletedResponsables).forEach(([name,ts])=>{
+            if(!deletedResponsables[name]||ts>deletedResponsables[name])deletedResponsables[name]=ts;
+          });
+        }
+        // Merge responsables — skip deleted ones
+        const merged=[...new Set([...responsables,...remote.responsables])]
+          .filter(name=>!deletedResponsables[name])
+          .sort((a,b)=>a.localeCompare(b,'es'));
+        responsables=merged;
         saveResponsables();
       }
     }
