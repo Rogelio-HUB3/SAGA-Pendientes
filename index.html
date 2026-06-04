@@ -807,7 +807,14 @@ function renderRespList(){
       const name=responsables[i];
       const active=tasks.filter(t=>t.responsable===name&&t.status!=='completado'&&t.status!=='cancelado').length;
       if(active>0&&!confirm(`${name} tiene ${active} tarea(s) activa(s). ¿Eliminar de todas formas?`))return;
-      responsables.splice(i,1);saveResponsables();renderRespList();
+      // Tombstone — mark as deleted with timestamp
+      deletedResponsables[name]=new Date().toISOString();
+      responsables.splice(i,1);
+      saveResponsables();
+      renderRespList();
+      showToast(`${name} eliminado`,'success');
+      // Immediately push deletion to SharePoint before next auto-sync
+      if(currentUser)syncNow();
     });
   });
 }
@@ -821,6 +828,8 @@ function addResponsable(){
   responsables.push(name);responsables.sort((a,b)=>a.localeCompare(b,'es'));
   saveResponsables();renderRespList();input.value='';input.focus();
   showToast(`${name} agregado`,'success');
+  // Immediately sync to SharePoint
+  if(currentUser)syncNow();
 }
 
 // ── AZURE / SHAREPOINT ──
@@ -957,18 +966,25 @@ async function syncNow(){
         .filter(t=>!deletedIds[t.id]||(t.updatedAt||'')>deletedIds[t.id])
         .sort((a,b)=>(b.updatedAt||'')>(a.updatedAt||'')?1:-1);
       if(remote.responsables&&Array.isArray(remote.responsables)){
-        // Merge deletedResponsables from remote
+        // Merge deletedResponsables — union of both (deletions always win)
         if(remote.deletedResponsables&&typeof remote.deletedResponsables==='object'){
           Object.entries(remote.deletedResponsables).forEach(([name,ts])=>{
             if(!deletedResponsables[name]||ts>deletedResponsables[name])deletedResponsables[name]=ts;
           });
         }
-        // Merge responsables — skip deleted ones
-        const merged=[...new Set([...responsables,...remote.responsables])]
-          .filter(name=>!deletedResponsables[name])
-          .sort((a,b)=>a.localeCompare(b,'es'));
-        responsables=merged;
-        saveResponsables();
+        // Add remote responsables that are NOT in tombstone and NOT already local
+        const remoteNew=remote.responsables.filter(name=>
+          !deletedResponsables[name] && !responsables.includes(name)
+        );
+        if(remoteNew.length>0){
+          responsables=[...new Set([...responsables,...remoteNew])]
+            .filter(name=>!deletedResponsables[name])
+            .sort((a,b)=>a.localeCompare(b,'es'));
+          saveResponsables();
+        } else {
+          // Still save to persist any tombstone updates from remote
+          localStorage.setItem(RESP_KEY+'_deleted',JSON.stringify(deletedResponsables));
+        }
       }
     }
     saveTasks();
