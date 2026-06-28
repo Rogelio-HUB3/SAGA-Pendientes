@@ -315,6 +315,12 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
     <option value="tramite">Trámite</option><option value="cliente">Cliente</option>
     <option value="interno">Interno</option>
   </select>
+  <input type="date" id="filter-from" class="filter-select" title="Desde fecha de solicitud" style="width:130px" onchange="filterFrom=this.value;renderAll()">
+  <input type="date" id="filter-to" class="filter-select" title="Hasta fecha de solicitud" style="width:130px" onchange="filterTo=this.value;renderAll()">
+  <button id="btn-hide-completed" class="btn btn-ghost" style="font-size:12px" title="Mostrar/ocultar tareas completadas y canceladas">
+    <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    Solo activas
+  </button>
   <div class="spacer"></div>
   <div class="view-toggle">
     <button class="view-btn active" id="view-table">
@@ -387,6 +393,14 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
           <input class="form-input" type="date" id="f-fecha-lim">
         </div>
         <div class="form-group">
+          <label class="form-label">Hora de solicitud <span style="font-weight:400;color:var(--gray-400);text-transform:none">(opcional)</span></label>
+          <input class="form-input" type="time" id="f-hora-sol">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Hora límite <span style="font-weight:400;color:var(--gray-400);text-transform:none">(opcional)</span></label>
+          <input class="form-input" type="time" id="f-hora-lim">
+        </div>
+        <div class="form-group">
           <label class="form-label">Prioridad</label>
           <select class="form-select" id="f-prioridad">
             <option value="baja">⚪ Baja</option>
@@ -432,6 +446,18 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
         <div class="form-group full">
           <label class="form-label">Notas y avances</label>
           <textarea class="form-textarea" id="f-notas" placeholder="Contexto adicional, instrucciones, últimos avances…"></textarea>
+        </div>
+        <div class="form-group full" id="notif-section" style="display:none">
+          <div class="divider"></div>
+          <label class="form-label" style="margin-bottom:8px">Notificaciones por correo</label>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;background:var(--saga-blue-soft);border-radius:var(--radius)">
+            <input type="checkbox" id="f-notificar" style="width:15px;height:15px;accent-color:var(--saga-blue);flex-shrink:0">
+            <span style="font-size:13px;color:var(--gray-700)">Notificarme por correo cuando esta tarea esté próxima a vencer (2 días antes) o vencida</span>
+          </label>
+          <label id="ceo-notif-row" style="display:none;align-items:center;gap:10px;cursor:pointer;padding:9px 12px;background:var(--purple-100);border-radius:var(--radius);margin-top:6px">
+            <input type="checkbox" id="f-notificar-ceo" style="width:15px;height:15px;accent-color:var(--purple-500);flex-shrink:0">
+            <span style="font-size:13px;color:var(--purple-700)">Recibir yo también esta notificación en mi correo (CEO)</span>
+          </label>
         </div>
       </div>
     </div>
@@ -527,8 +553,27 @@ body{font-family:var(--font);background:var(--gray-50);color:var(--gray-800);min
 const STORAGE_KEY='saga_v3';
 const RESP_KEY='saga_resp_v1';
 const SP_CONFIG_KEY='saga_sp_v1';
-const SYNCED_KEY='saga_synced_v1'; // flag: has this browser ever synced?
+const SYNCED_KEY='saga_synced_v1';
+const NOTIFIED_KEY='saga_notified_v1';
+const USER_MAP={
+  'ahernandez@sagamasseguros.com':'Abigail Hernández',
+  'astone@sagamasseguros.com':'Aída Stone',
+  'danos@sagamasseguros.com':'Armando Alcántara',
+  'soporte@sagamasseguros.com':'Aura Velázquez',
+  'siniestros@sagamasseguros.com':'Christopher de León',
+  'jpichardo@sagamasseguros.com':'Judith Pichardo',
+  'beneficioscorporativo@sagamasseguros.com':'Lou García',
+  'paola@sagamasseguros.com':'Paola González',
+  'proyectos@sagamasseguros.com':'Rogelio Hernández',
+  'comunicacion@sagamasseguros.com':'Valentina Suárez',
+  'yuridia@sagamasseguros.com':'Yuri Gómez',
+};
+const CEO_EMAIL='yuridia@sagamasseguros.com';
+const CEO_NAME='Yuri Gómez';
 let tasks=[], responsables=[], deletedIds={}, deletedResponsables={}, currentView='table', editingId=null, _lastHash='';
+let currentUserEmail='', currentUserName='', isCEO=false;
+let hideCompleted=false, filterFrom='', filterTo='';
+let sentNotifications={};
 
 // ── HELPERS ──
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -584,6 +629,121 @@ function saveResponsables(){
   localStorage.setItem(RESP_KEY,JSON.stringify(responsables));
   localStorage.setItem(RESP_KEY+'_deleted',JSON.stringify(deletedResponsables));
 }
+
+// ── PERMISSION SYSTEM (Point 2) ──
+function detectCurrentUser(){
+  if(!currentUser)return;
+  const email=((currentUser.username||currentUser.upn||'')).toLowerCase().trim();
+  currentUserEmail=email;
+  currentUserName=USER_MAP[email]||'';
+  isCEO=(email===CEO_EMAIL);
+  // Load sent notifications registry
+  try{const d=localStorage.getItem(NOTIFIED_KEY);if(d)sentNotifications=JSON.parse(d);}catch(e){sentNotifications={};}
+}
+function canEdit(task){
+  if(!currentUser)return false;
+  if(isCEO)return true;
+  if(!currentUserName)return false;
+  return(task.responsable||'')===currentUserName;
+}
+function canCreate(){
+  return currentUser&&(isCEO||!!currentUserName);
+}
+function lockFormFields(disabled){
+  ['f-titulo','f-tipo','f-responsable','f-fecha-sol','f-fecha-lim','f-hora-sol','f-hora-lim',
+   'f-prioridad','f-status','f-blocker-tipo','f-blocker-detalle','f-poliza','f-cliente','f-notas']
+  .forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=disabled;});
+}
+
+// ── NOTIFICATION SYSTEM (Point 3) ──
+function markNotificationSent(taskId, type){
+  if(!sentNotifications[taskId])sentNotifications[taskId]={};
+  sentNotifications[taskId][type]=new Date().toISOString();
+  localStorage.setItem(NOTIFIED_KEY,JSON.stringify(sentNotifications));
+}
+function wasNotified(taskId, type){
+  return !!(sentNotifications[taskId]&&sentNotifications[taskId][type]);
+}
+
+async function sendNotificationEmail(task, daysLeft){
+  if(!currentUser||!currentUserEmail)return;
+  try{
+    const token=await getToken();
+    const isOverdue=daysLeft<0;
+    const subject=isOverdue
+      ?`[SAGA] 🔴 Tarea VENCIDA: ${task.titulo}`
+      :`[SAGA] ⚠️ Tarea próxima a vencer (${daysLeft} día${daysLeft!==1?'s':''}): ${task.titulo}`;
+    const body=`
+<div style="font-family:Arial,sans-serif;max-width:600px">
+  <div style="background:#1a5fa8;padding:16px 24px;border-radius:8px 8px 0 0">
+    <h2 style="color:#fff;margin:0;font-size:18px">SAGA · Seguimiento de Pendientes</h2>
+  </div>
+  <div style="border:1px solid #dde8f4;border-top:none;padding:20px 24px;border-radius:0 0 8px 8px">
+    <p style="font-size:14px;color:#30516e;margin-bottom:16px">
+      ${isOverdue?'<strong style="color:#d93030">⚠️ La siguiente tarea ha VENCIDO</strong>':'<strong style="color:#d48b00">⏰ La siguiente tarea vence pronto</strong>'}
+    </p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <tr><td style="padding:6px 0;color:#6a8fae;width:140px">Pendiente:</td><td style="padding:6px 0;font-weight:600;color:#112233">${task.titulo}</td></tr>
+      <tr><td style="padding:6px 0;color:#6a8fae">Responsable:</td><td style="padding:6px 0;color:#112233">${task.responsable}</td></tr>
+      <tr><td style="padding:6px 0;color:#6a8fae">Fecha límite:</td><td style="padding:6px 0;color:${isOverdue?'#d93030':'#d48b00'};font-weight:600">${task.fechaLim?task.fechaLim.split('-').reverse().join('/'):'—'}${task.horaLim?' '+task.horaLim:''}</td></tr>
+      <tr><td style="padding:6px 0;color:#6a8fae">Póliza:</td><td style="padding:6px 0;color:#112233">${task.poliza||'—'}</td></tr>
+      <tr><td style="padding:6px 0;color:#6a8fae">Cliente:</td><td style="padding:6px 0;color:#112233">${task.cliente||'—'}</td></tr>
+      <tr><td style="padding:6px 0;color:#6a8fae">Estatus:</td><td style="padding:6px 0;color:#112233">${task.status}</td></tr>
+      ${task.notas?`<tr><td style="padding:6px 0;color:#6a8fae">Notas:</td><td style="padding:6px 0;color:#112233">${task.notas}</td></tr>`:''}
+    </table>
+    <div style="margin-top:20px;padding:12px 16px;background:#e8f2fb;border-radius:6px;font-size:12px;color:#30516e">
+      Este recordatorio fue configurado en la app SAGA · Seguimiento de Pendientes.<br>
+      <a href="https://rogelio-hub3.github.io/SAGA-Pendientes/" style="color:#1a5fa8">Abrir la app</a>
+    </div>
+  </div>
+</div>`;
+    await fetch('https://graph.microsoft.com/v1.0/me/sendMail',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        message:{
+          subject,
+          body:{contentType:'HTML',content:body},
+          toRecipients:[{emailAddress:{address:currentUserEmail}}]
+        },saveToSentItems:false
+      })
+    });
+  }catch(e){console.error('Error sending notification:',e);}
+}
+
+async function checkAndSendNotifications(){
+  if(!currentUser||!currentUserEmail)return;
+  const today=new Date();today.setHours(0,0,0,0);
+  let changed=false;
+  for(const task of tasks){
+    if(task.status==='completado'||task.status==='cancelado')continue;
+    if(!task.fechaLim)continue;
+    const deadline=new Date(task.fechaLim+'T00:00:00');
+    const daysLeft=Math.floor((deadline-today)/(1000*60*60*24));
+    if(daysLeft>2)continue; // more than 2 days away → skip
+    // Responsable notification
+    if(task.notificar&&currentUserName===task.responsable&&!wasNotified(task.id,'resp')){
+      await sendNotificationEmail(task,daysLeft);
+      markNotificationSent(task.id,'resp');
+      changed=true;
+    }
+    // CEO notification
+    if(task.notificarCEO&&isCEO&&!wasNotified(task.id,'ceo')){
+      await sendNotificationEmail(task,daysLeft);
+      markNotificationSent(task.id,'ceo');
+      changed=true;
+    }
+  }
+  if(changed)console.log('Notifications sent');
+}
+
+// Reset notification sent flag when deadline changes (called from doSave)
+function resetNotificationIfDeadlineChanged(task, newFechaLim){
+  if(task.fechaLim!==newFechaLim&&sentNotifications[task.id]){
+    delete sentNotifications[task.id];
+    localStorage.setItem(NOTIFIED_KEY,JSON.stringify(sentNotifications));
+  }
+}
 function getSampleData(){
   const t=new Date(),d=n=>{const x=new Date(t);x.setDate(x.getDate()+n);return x.toISOString().split('T')[0];};
   return[
@@ -606,6 +766,9 @@ function getFiltered(){
     if(fS&&t.status!==fS)return false;
     if(fP&&t.prioridad!==fP)return false;
     if(fT&&t.tipo!==fT)return false;
+    if(hideCompleted&&(t.status==='completado'||t.status==='cancelado'))return false;
+    if(filterFrom&&t.fechaSol&&t.fechaSol<filterFrom)return false;
+    if(filterTo&&t.fechaSol&&t.fechaSol>filterTo)return false;
     return true;
   });
 }
@@ -668,7 +831,7 @@ function renderTable(filtered){
       <td><span class="badge bp-${t.prioridad}">${t.prioridad}</span></td>
       <td><span class="badge bs-${t.status}">${statusLabel(t.status)}</span></td>
       <td>${bl}</td>
-      <td><button class="action-btn" data-id="${t.id}"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+      <td>${canEdit(t)?`<button class="action-btn" data-id="${t.id}"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`:`<span title="Solo ${esc(t.responsable||'el responsable')} puede editar" style="font-size:13px;opacity:.35;cursor:default">🔒</span>`}</td>
     </tr>`;
   }).join('');
   document.getElementById('content').innerHTML=`<div class="table-wrap"><div class="table-scroll"><table class="tasks-table"><thead><tr><th>Pendiente / Póliza</th><th>Responsable</th><th>Solicitud</th><th>Fecha límite</th><th>Prioridad</th><th>Estatus</th><th>Blocker</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
@@ -698,12 +861,20 @@ function renderKanban(filtered){
 function openModal(id){
   editingId=id||null;
   const t=id?tasks.find(x=>x.id===id):null;
+  const editable=t?canEdit(t):canCreate();
+
   document.getElementById('modal-title').textContent=t?'Editar tarea':'Nueva tarea';
-  document.getElementById('modal-delete').style.display=t?'inline-flex':'none';
+  // Show delete only if editable and task exists
+  document.getElementById('modal-delete').style.display=(t&&editable)?'inline-flex':'none';
+  // Show save only if editable
+  document.getElementById('modal-save').style.display=editable?'inline-flex':'none';
+
   document.getElementById('f-titulo').value=t?t.titulo:'';
   document.getElementById('f-tipo').value=t?t.tipo:'siniestro';
   document.getElementById('f-fecha-sol').value=t?t.fechaSol:new Date().toISOString().split('T')[0];
   document.getElementById('f-fecha-lim').value=t?t.fechaLim:'';
+  document.getElementById('f-hora-sol').value=t?t.horaSol||'':'';
+  document.getElementById('f-hora-lim').value=t?t.horaLim||'':'';
   document.getElementById('f-prioridad').value=t?t.prioridad:'media';
   document.getElementById('f-status').value=t?t.status:'pendiente';
   document.getElementById('f-blocker-tipo').value=t?t.blockerTipo:'';
@@ -712,13 +883,50 @@ function openModal(id){
   document.getElementById('f-cliente').value=t?t.cliente:'';
   document.getElementById('f-notas').value=t?t.notas:'';
   document.getElementById('blocker-box').style.display=(t&&t.blockerTipo)?'block':'none';
+
+  // Responsable select
   const rsel=document.getElementById('f-responsable');
   const allResps=[...new Set([...responsables,...tasks.map(x=>x.responsable).filter(Boolean),...(t&&t.responsable?[t.responsable]:[])])].sort((a,b)=>a.localeCompare(b,'es'));
-  rsel.innerHTML=allResps.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
-  if(t&&t.responsable)rsel.value=t.responsable;
-  else if(allResps.length)rsel.value=allResps[0];
+  if(isCEO){
+    // CEO sees all responsables and can assign to anyone
+    rsel.innerHTML=allResps.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    if(t&&t.responsable)rsel.value=t.responsable;
+    else if(allResps.length)rsel.value=allResps[0];
+    rsel.disabled=false;
+  } else if(currentUserName&&!t){
+    // New task by non-CEO: can only assign to themselves
+    rsel.innerHTML=`<option value="${esc(currentUserName)}">${esc(currentUserName)}</option>`;
+    rsel.value=currentUserName;
+    rsel.disabled=true;
+  } else {
+    // Viewing/editing existing task
+    rsel.innerHTML=allResps.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    if(t&&t.responsable)rsel.value=t.responsable;
+    else if(allResps.length)rsel.value=allResps[0];
+    rsel.disabled=!editable||!isCEO; // only CEO can change responsable on existing tasks
+  }
+
+  // Lock/unlock all form fields based on permission
+  lockFormFields(!editable);
+  // Responsable handled above separately
+  if(editable) document.getElementById('f-responsable').disabled = !isCEO&&!!t;
+
+  // Notification section (Point 3)
+  const notifSection=document.getElementById('notif-section');
+  const ceoRow=document.getElementById('ceo-notif-row');
+  const notifCB=document.getElementById('f-notificar');
+  const notifCeoCB=document.getElementById('f-notificar-ceo');
+  const showNotif=editable&&currentUser;
+  notifSection.style.display=showNotif?'block':'none';
+  notifCB.checked=!!(t&&t.notificar);
+  notifCeoCB.checked=!!(t&&t.notificarCEO);
+  ceoRow.style.display=isCEO?'flex':'none';
+  // Only responsable or CEO can toggle their own checkbox
+  notifCB.disabled=!(editable&&(isCEO||(currentUserName&&t&&t.responsable===currentUserName)||!t));
+  notifCeoCB.disabled=!isCEO;
+
   document.getElementById('modal-overlay').style.display='flex';
-  setTimeout(()=>document.getElementById('f-titulo').focus(),80);
+  setTimeout(()=>{if(editable)document.getElementById('f-titulo').focus();},80);
 }
 function closeModal(){
   document.getElementById('modal-overlay').style.display='none';
@@ -732,14 +940,21 @@ function doSave(){
   if(!titulo){showToast('Escribe la descripción del pendiente','error');return;}
   if(!responsable){showToast('Asigna un responsable','error');return;}
   const wasEditing=!!editingId;
+  const existing=wasEditing?tasks.find(x=>x.id===editingId):null;
+  if(existing&&!canEdit(existing)){showToast('No tienes permiso para editar esta tarea','error');return;}
+  if(!wasEditing&&!canCreate()){showToast('Inicia sesión con tu cuenta Microsoft para crear tareas','error');return;}
   const taskId=editingId||uid();
-  const task={
+  const newFechaLim=document.getElementById('f-fecha-lim').value;
+  if(existing&&existing.fechaLim!==newFechaLim){
+    if(sentNotifications[taskId]){delete sentNotifications[taskId];localStorage.setItem(NOTIFIED_KEY,JSON.stringify(sentNotifications));}
+  }
+  const newFields={
     id:taskId,titulo,
     tipo:document.getElementById('f-tipo').value,
     responsable,
     cliente:(document.getElementById('f-cliente').value||'').trim(),
     fechaSol:document.getElementById('f-fecha-sol').value,
-    fechaLim:document.getElementById('f-fecha-lim').value,
+    fechaLim:newFechaLim,
     prioridad:document.getElementById('f-prioridad').value,
     status:document.getElementById('f-status').value,
     blockerTipo:document.getElementById('f-blocker-tipo').value,
@@ -748,17 +963,27 @@ function doSave(){
     notas:(document.getElementById('f-notas').value||'').trim(),
     updatedAt:new Date().toISOString()
   };
+  const horaSol=(document.getElementById('f-hora-sol').value||'').trim();
+  const horaLim=(document.getElementById('f-hora-lim').value||'').trim();
+  if(horaSol)newFields.horaSol=horaSol;
+  if(horaLim)newFields.horaLim=horaLim;
+  if(document.getElementById('f-notificar').checked)newFields.notificar=true;
+  if(document.getElementById('f-notificar-ceo').checked)newFields.notificarCEO=true;
+  // Merge with existing task to preserve all original fields
+  const task=existing?Object.assign({},existing,newFields):newFields;
   if(wasEditing){const i=tasks.findIndex(x=>x.id===taskId);if(i>-1)tasks[i]=task;else tasks.unshift(task);}
   else tasks.unshift(task);
   saveTasks();
   closeModal();
   renderAll();
   showBanner(wasEditing?'Tarea actualizada':'Tarea creada');
+  if(currentUser)setTimeout(syncNow,500);
 }
 function doDelete(){
   if(!editingId)return;
+  const existing=tasks.find(t=>t.id===editingId);
+  if(existing&&!canEdit(existing)){showToast('No tienes permiso para eliminar esta tarea','error');return;}
   if(!confirm('¿Eliminar esta tarea permanentemente?'))return;
-  // Mark as deleted with timestamp (tombstone)
   deletedIds[editingId]=new Date().toISOString();
   tasks=tasks.filter(t=>t.id!==editingId);
   saveTasks();
@@ -891,13 +1116,15 @@ async function connectToSharePoint(){
     const ready=await initMsal(clientId,tenantId);
     if(!ready)throw new Error('No se pudo inicializar MSAL — verifica Client ID y Tenant ID');
     const resp=await msalInstance.loginPopup({
-      scopes:['Files.ReadWrite','Sites.ReadWrite.All','User.Read'],
+      scopes:['Files.ReadWrite','Sites.ReadWrite.All','User.Read','Mail.Send'],
       prompt:'select_account'
     });
     currentUser=resp.account;
     spConfig.clientId=clientId;spConfig.tenantId=tenantId;
     localStorage.setItem(SP_CONFIG_KEY,JSON.stringify(spConfig));
+    detectCurrentUser();
     showConnectedState();startAutoSync();await syncNow();
+    await checkAndSendNotifications();
     showToast('Conectado a Microsoft 365 ✓','success');
   }catch(e){
     console.error('Connect error:',e);
@@ -907,8 +1134,8 @@ async function connectToSharePoint(){
 }
 async function getToken(){
   if(!msalInstance||!currentUser)throw new Error('No autenticado');
-  try{const r=await msalInstance.acquireTokenSilent({scopes:['Files.ReadWrite','Sites.ReadWrite.All'],account:currentUser});return r.accessToken;}
-  catch{const r=await msalInstance.acquireTokenPopup({scopes:['Files.ReadWrite','Sites.ReadWrite.All']});return r.accessToken;}
+  try{const r=await msalInstance.acquireTokenSilent({scopes:['Files.ReadWrite','Sites.ReadWrite.All','Mail.Send'],account:currentUser});return r.accessToken;}
+  catch{const r=await msalInstance.acquireTokenPopup({scopes:['Files.ReadWrite','Sites.ReadWrite.All','Mail.Send']});return r.accessToken;}
 }
 async function getSiteInfo(token){
   const url=spConfig.siteUrl.replace(/\/$/,'');
@@ -1007,7 +1234,9 @@ async function syncNow(){
     setSyncDot('ok');
     document.getElementById('sync-label').textContent='Sync '+timeStr;
     document.getElementById('sp-status-sub').textContent='Última sync: '+timeStr;
-    setSpStatusRow('ok',currentUser.name||currentUser.username,'Sincronizado con SharePoint · '+timeStr);
+    const displayName=currentUserName||currentUser.name||currentUser.username||'';
+    setSpStatusRow('ok',displayName,'Sincronizado con SharePoint · '+timeStr);
+    checkAndSendNotifications().catch(e=>console.error('Notif error:',e));
   }catch(e){
     setSyncDot('error');
     setSpStatusRow('error','Error de sincronización',e.message||String(e));
@@ -1035,9 +1264,12 @@ function disconnectSharePoint(){
   showToast('Cuenta desconectada');
 }
 function showConnectedState(){
+  detectCurrentUser();
   document.getElementById('sp-config-section').style.display='none';
   document.getElementById('sp-connected-section').style.display='block';
-  setSpStatusRow('ok',currentUser?(currentUser.name||currentUser.username):'Conectado','Cuenta Microsoft vinculada');
+  const displayName=currentUserName||currentUser.name||currentUser.username||'Conectado';
+  const roleTag=isCEO?' (CEO)':currentUserName?' ✓':'';
+  setSpStatusRow('ok',displayName+roleTag,'Cuenta Microsoft vinculada');
   setSyncDot('ok');document.getElementById('sync-label').textContent='Conectado';
 }
 function setSpStatusRow(type,label,detail){
@@ -1077,7 +1309,17 @@ function taskInPeriod(task,period){
 function avgDays(arr){
   const r=arr.filter(t=>t.fechaSol&&t.fechaLim&&t.status==='completado');
   if(!r.length)return null;
-  return Math.round(r.reduce((s,t)=>s+Math.max(0,Math.floor((new Date(t.fechaLim+'T00:00:00')-new Date(t.fechaSol+'T00:00:00'))/(86400000))),0)/r.length);
+  // If any task has both hora fields, compute hours for those; else compute days
+  const withHours=r.filter(t=>t.horaSol&&t.horaLim);
+  if(withHours.length>0){
+    const totalHours=withHours.reduce((s,t)=>{
+      const start=new Date(t.fechaSol+'T'+t.horaSol);
+      const end=new Date(t.fechaLim+'T'+t.horaLim);
+      return s+Math.max(0,(end-start)/(1000*60*60));
+    },0);
+    return{value:Math.round(totalHours/withHours.length*10)/10,unit:'hrs',count:withHours.length};
+  }
+  return{value:Math.round(r.reduce((s,t)=>s+Math.max(0,Math.floor((new Date(t.fechaLim+'T00:00:00')-new Date(t.fechaSol+'T00:00:00'))/(86400000))),0)/r.length),unit:'días',count:r.length};
 }
 
 function renderScore(){
@@ -1130,7 +1372,7 @@ function renderScore(){
         <div class="stat-item s-overdue"><div class="stat-val">${c.overdue}</div><div class="stat-lbl">Vencidas</div></div>
       </div>
       <div class="avg-chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Tiempo prom. resolución: <strong style="margin-left:3px">${c.avg!==null?c.avg+' día'+(c.avg!==1?'s':''):'Sin datos'}</strong>
+        Tiempo prom. resolución: <strong style="margin-left:3px">${c.avg!==null?c.avg.value+' '+c.avg.unit+' ('+c.avg.count+' tarea'+( c.avg.count!==1?'s':'')+')':"Sin datos"}</strong>
       </div>
       <div class="score-chart">
         <div class="chart-title">Tareas por tipo</div>
@@ -1184,6 +1426,15 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadTasks();
   loadResponsables();
   _lastHash=JSON.stringify(tasks);
+
+  // Wire hide-completed toggle (Point 1)
+  document.getElementById('btn-hide-completed').addEventListener('click',function(){
+    hideCompleted=!hideCompleted;
+    this.style.background=hideCompleted?'var(--saga-blue)':'transparent';
+    this.style.color=hideCompleted?'#fff':'var(--gray-500)';
+    this.style.borderColor=hideCompleted?'var(--saga-blue)':'var(--gray-200)';
+    renderAll();
+  });
 
   document.getElementById('btn-new').addEventListener('click',()=>openModal());
   document.getElementById('btn-responsables').addEventListener('click',openRespModal);
