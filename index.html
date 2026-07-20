@@ -557,7 +557,7 @@ const SYNCED_KEY='saga_synced_v1';
 const NOTIFIED_KEY='saga_notified_v1';
 const USER_MAP={
   'ahernandez@sagamasseguros.com':'Abigail Hernández',
-  'astone@sagamasseguros.com':'Aída Stone',
+  'astone@sagamasseguros.com':'Aida Stone',
   'danos@sagamasseguros.com':'Armando Alcántara',
   'soporte@sagamasseguros.com':'Aura Velázquez',
   'siniestros@sagamasseguros.com':'Christopher de León',
@@ -640,11 +640,15 @@ function detectCurrentUser(){
   // Load sent notifications registry
   try{const d=localStorage.getItem(NOTIFIED_KEY);if(d)sentNotifications=JSON.parse(d);}catch(e){sentNotifications={};}
 }
+function normName(s){
+  // Normalize accents and lowercase for robust name comparison
+  return(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+}
 function canEdit(task){
   if(!currentUser)return false;
   if(isCEO)return true;
   if(!currentUserName)return false;
-  return(task.responsable||'')===currentUserName;
+  return normName(task.responsable)===normName(currentUserName);
 }
 function canCreate(){
   return currentUser&&(isCEO||!!currentUserName);
@@ -894,9 +898,10 @@ function openModal(id){
     else if(allResps.length)rsel.value=allResps[0];
     rsel.disabled=false;
   } else if(currentUserName&&!t){
-    // New task by non-CEO: can only assign to themselves
-    rsel.innerHTML=`<option value="${esc(currentUserName)}">${esc(currentUserName)}</option>`;
-    rsel.value=currentUserName;
+    // New task by non-CEO: find exact name from responsables list (handles accent differences)
+    const selfName=responsables.find(r=>normName(r)===normName(currentUserName))||currentUserName;
+    rsel.innerHTML=`<option value="${esc(selfName)}">${esc(selfName)}</option>`;
+    rsel.value=selfName;
     rsel.disabled=true;
   } else {
     // Viewing/editing existing task
